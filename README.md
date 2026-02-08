@@ -1,37 +1,45 @@
-# PFT WhiteLabel v2 Documentation
+# PFT WhiteLabel v2 - Client Documentation
 
-Welcome to the PFT (Prop Firms Tech) WhiteLabel v2 documentation portal.
+Welcome to the PFT (Prop Firms Tech) WhiteLabel v2 client documentation portal.
 
-## Documentation Resources
+## 📚 Client Journey Documentation
 
-### For Developers & AI Assistants
+Comprehensive guides to help you understand and navigate the trading platform:
 
-**Full technical documentation**: [dashboard-docs](https://github.com/PFT-PropFirmsTech-com/dashboard-docs)
+### [1. Client User Journey](client-diagrams/01-CLIENT-USER-JOURNEY.md)
+Your complete path from registration to funded trading - understand every step of your journey to becoming a funded trader.
 
-Contains:
-- Complete user flow diagrams with technical implementation details
-- API endpoints, database models, rule engine logic
-- System architecture and integration details
-- All backend/frontend technical specifications
+### [2. Account Purchase Flow](client-diagrams/02-ACCOUNT-PURCHASE-FLOW.md)
+Step-by-step guide through selecting, customizing, and purchasing your trading challenge account.
 
-Use this when working on the system or understanding how services connect.
+### [3. Trading Experience](client-diagrams/03-TRADING-EXPERIENCE.md)
+Everything you need to know about trading on the platform - from receiving credentials to monitoring your progress.
 
-### For Clients
+### [4. Account Outcomes](client-diagrams/04-ACCOUNT-OUTCOMES.md)
+Understand what happens when you pass or breach - certificates, advancement, and next steps.
 
-**Client-facing documentation**: Coming soon (simplified user journey flows only)
+### [5. Withdrawal Process](client-diagrams/05-WITHDRAWAL-PROCESS.md)
+Complete guide to requesting and receiving your trading profits.
+
+### [6. Email Notifications](client-diagrams/06-EMAIL-NOTIFICATIONS.md)
+All the automated emails you'll receive throughout your trading journey and what they mean.
 
 ---
 
-## System Components
+## 🎯 Quick Start
 
-This project consists of multiple integrated services:
+1. **New to the platform?** Start with the [Client User Journey](client-diagrams/01-CLIENT-USER-JOURNEY.md)
+2. **Ready to purchase?** Check the [Account Purchase Flow](client-diagrams/02-ACCOUNT-PURCHASE-FLOW.md)
+3. **Starting to trade?** Read the [Trading Experience](client-diagrams/03-TRADING-EXPERIENCE.md)
 
-- **pft-backend** - Main API server
-- **pft-dashboard** - Frontend dashboard
-- **pft-rule-checker** - Trade monitoring and rule engine
-- **mt5-rest-api-deploy** - MetaTrader 5 integration
-- **super-admin** - Admin panel
-- **pfr-super-admin** - Super admin panel
+---
+
+## 🔗 Additional Resources
+
+### For Developers & Technical Teams
+**Full technical documentation**: [dashboard-docs](https://github.com/PFT-PropFirmsTech-com/dashboard-docs)
+
+Contains API endpoints, database models, system architecture, and integration details.
 
 ---
 
