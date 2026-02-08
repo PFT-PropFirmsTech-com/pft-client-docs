@@ -1,0 +1,15 @@
+# GitHub Pages Configuration
+theme: jekyll-theme-cayman
+title: PFT Client Documentation
+description: Client-facing documentation for the PFT trading platform
+
+# Exclude files from processing
+exclude:
+  - .gitignore
+  - README.md
+
+# Markdown settings
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
