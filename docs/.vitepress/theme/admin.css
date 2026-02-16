@@ -1,0 +1,72 @@
+.admin-locked .vp-doc,
+.admin-locked .VPDocAside {
+  display: none !important;
+}
+
+.admin-gate {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  background: var(--vp-c-bg);
+}
+
+.admin-gate-box {
+  text-align: center;
+  max-width: 360px;
+  padding: 2rem;
+}
+
+.admin-gate-box h2 {
+  margin-bottom: 0.5rem;
+  font-size: 1.4rem;
+}
+
+.admin-gate-box p {
+  margin-bottom: 1.5rem;
+  color: var(--vp-c-text-2);
+}
+
+.admin-input {
+  display: block;
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  font-size: 1rem;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+}
+
+.admin-input:focus {
+  outline: none;
+  border-color: var(--vp-c-brand-1);
+}
+
+.admin-btn {
+  width: 100%;
+  padding: 0.6rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--vp-c-brand-1);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.admin-btn:hover {
+  background: var(--vp-c-brand-2);
+}
+
+.admin-error {
+  color: var(--vp-c-danger-1, #e53e3e);
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}

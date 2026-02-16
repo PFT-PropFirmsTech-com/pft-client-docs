@@ -140,9 +140,11 @@ This guide explains all email notifications you'll receive throughout your journ
 
 ---
 
-## Withdrawal & Payout Emails
+## Reward (Trading Profit Withdrawal) Emails
 
-### Payout Requested
+> **Note**: "Reward" refers to withdrawing your trading profits from a funded account. This is separate from Affiliate Withdrawals (referral commissions). Some platforms may label these as "Payout" instead of "Reward" — the process is identical.
+
+### Reward Requested
 **When you receive it**: Immediately after you submit a withdrawal request
 
 **What it contains**:
@@ -156,8 +158,8 @@ This guide explains all email notifications you'll receive throughout your journ
 
 ---
 
-### Payout Approved
-**When you receive it**: When an administrator approves your withdrawal
+### Reward Approved
+**When you receive it**: When an administrator approves your reward request
 
 **What it contains**:
 - Approval confirmation
@@ -171,8 +173,8 @@ This guide explains all email notifications you'll receive throughout your journ
 
 ---
 
-### Payout Confirmed
-**When you receive it**: When your withdrawal payment is completed
+### Reward Confirmed
+**When you receive it**: When your reward payment is completed
 
 **What it contains**:
 - Payment completion confirmation
@@ -186,16 +188,33 @@ This guide explains all email notifications you'll receive throughout your journ
 
 ---
 
-### Payout Rejected
-**When you receive it**: When an administrator rejects your withdrawal request
+### Reward Rejected
+**When you receive it**: When an administrator rejects your reward request due to a rule violation, suspicious activity, or other compliance issue
 
 **What it contains**:
 - Rejection notification
 - Reason for rejection
-- Requested amount (returned to your balance)
-- Next steps or how to resolve the issue
+- Withdrawal amount and date
+- Rejection date
 
-**What to do**: Read the rejection reason carefully. Contact support if you need clarification or help resolving the issue.
+**What to do**: Read the rejection reason carefully. A rejection may include a balance penalty on your trading account depending on the circumstances. Contact support if you need clarification or believe this was an error.
+
+> **Note**: Rejection is different from cancellation. A rejection means there was an issue with your withdrawal eligibility or compliance. Your account balance may be affected.
+
+---
+
+### Reward Cancelled
+**When you receive it**: When an administrator cancels your reward request due to an administrative issue (e.g., incorrect wallet address, wrong payment details, or at your own request)
+
+**What it contains**:
+- Cancellation notification
+- Cancellation reason
+- Withdrawal amount and date
+- Cancellation date
+
+**What to do**: Review the cancellation reason. Cancellation does not affect your account balance or trading metrics. You can immediately submit a new withdrawal request with the corrected information.
+
+> **Note**: Cancellation is a neutral action — no penalty is applied. Simply fix the issue (e.g., correct your wallet address) and resubmit.
 
 ---
 
@@ -428,17 +447,19 @@ graph TD
 
     J -->|Continue Inactive| M[Inactivity Breach Email]
 
-    F --> N[Request Withdrawal]
-    N -->|Instant| O[Payout Requested Email]
+    F --> N[Request Reward]
+    N -->|Instant| O[Reward Requested Email]
     O --> P{Admin Review}
-    P -->|Approved| Q[Payout Approved Email]
-    P -->|Rejected| R[Payout Rejected Email]
-    Q -->|Payment Sent| S[Payout Confirmed Email]
+    P -->|Approved| Q[Reward Approved Email]
+    P -->|Rejected| R[Reward Rejected Email]
+    P -->|Cancelled| T[Reward Cancelled Email]
+    T -->|Fix & Resubmit| N
+    Q -->|Payment Sent| S[Reward Confirmed Email]
 ```
 
 ---
 
-## User Journey: From Registration to Payout
+## User Journey: From Registration to Reward
 
 ```mermaid
 flowchart LR
@@ -453,10 +474,11 @@ flowchart LR
     I -->|Progression Email| J[New Account Credentials]
     J --> K[Continue Trading]
     K --> L[Become Funded]
-    L --> M[Request Withdrawal]
-    M -->|Payout Requested Email| N[Admin Reviews]
-    N -->|Payout Approved Email| O[Payment Processing]
-    O -->|Payout Confirmed Email| P[Receive Funds]
+    L --> M[Request Reward]
+    M -->|Reward Requested Email| N[Admin Reviews]
+    N -->|Reward Approved Email| O[Payment Processing]
+    N -->|Reward Cancelled Email| M
+    O -->|Reward Confirmed Email| P[Receive Funds]
 ```
 
 ---
@@ -527,8 +549,8 @@ A: You can view your MT5 credentials anytime in your dashboard under "My Account
 **Q: Why did I receive an inactivity warning?**
 A: Your trading account hasn't had any trading activity for the warning threshold period. Trade at least once to reset the inactivity timer.
 
-**Q: How long does it take to receive withdrawal confirmation?**
-A: You'll receive a "Payout Requested" email immediately. The "Payout Approved" email comes after admin review (usually 1-3 business days). The "Payout Confirmed" email is sent when payment is completed.
+**Q: How long does it take to receive reward confirmation?**
+A: You'll receive a "Reward Requested" email immediately. The "Reward Approved" email comes after admin review (usually 1-3 business days). The "Reward Confirmed" email is sent when payment is completed.
 
 **Q: What should I do if I receive a breach email but think it's a mistake?**
 A: Contact support immediately with your account details and explain the situation. Include the breach email for reference.
@@ -560,10 +582,11 @@ A: Email language settings may be available in your profile settings. Contact su
 | Challenge Passed | Meet requirements | Check dashboard |
 | Challenge Not Passed | Rule breach | Review details |
 | Program Progression | Phase advancement | Use new credentials |
-| Payout Requested | Submit withdrawal | Wait for review |
-| Payout Approved | Admin approves | Wait for payment |
-| Payout Confirmed | Payment sent | Confirm receipt |
-| Payout Rejected | Admin rejects | Review reason |
+| Reward Requested | Submit reward request | Wait for review |
+| Reward Approved | Admin approves | Wait for payment |
+| Reward Confirmed | Payment sent | Confirm receipt |
+| Reward Rejected | Admin rejects | Review reason |
+| Reward Cancelled | Admin cancels (e.g., wrong wallet) | Fix & resubmit |
 | KYC Submitted | Upload documents | Wait for review |
 | KYC Approved | Documents approved | None |
 | KYC Rejected | Documents rejected | Resubmit |

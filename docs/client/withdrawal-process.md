@@ -55,12 +55,13 @@ flowchart TD
 
     Decision -->|Approved| Approved[Withdrawal Approved]
     Decision -->|Needs Info| MoreInfo[Additional Information Needed]
-    Decision -->|Declined| Declined[Request Declined]
+    Decision -->|Rejected| Declined[Request Rejected]
+    Decision -->|Cancelled| Cancelled[Request Cancelled]
 
     MoreInfo --> ProvideInfo[Provide Requested Information]
     ProvideInfo --> AdminReview
 
-    Declined --> Reason[See Decline Reason:<br/>- Explanation provided<br/>- Next steps<br/>- Contact support option]
+    Declined --> Reason[See Rejection Reason:<br/>- Rule violation or compliance issue<br/>- Balance may be penalized<br/>- Contact support if needed]
 
     Reason --> ContactSupport{Contact Support?}
     ContactSupport -->|Yes| Support[Speak with Support Team]
@@ -69,6 +70,11 @@ flowchart TD
     Support --> Resolution{Issue Resolved?}
     Resolution -->|Yes| RequestWithdrawal
     Resolution -->|No| KeepTrading
+
+    Cancelled --> CancelReason[See Cancellation Reason:<br/>- Wrong wallet address<br/>- Incorrect payment details<br/>- Requested by you<br/>- No balance impact]
+
+    CancelReason --> FixAndResubmit[Fix the Issue & Resubmit]
+    FixAndResubmit --> RequestWithdrawal
 
     Approved --> Processing[Processing Your Payout]
 
@@ -249,19 +255,40 @@ gantt
 - **Maximum Allowed**: Highest amount allowed
 - **Next Eligible Date**: When you can withdraw again
 
-## If Request Is Declined
+## If Your Request Is Rejected
+
+A rejection means there was a compliance or eligibility issue with your withdrawal. Depending on the reason, your account balance may be penalized.
 
 ### Common Reasons
+- **Rule Violation**: Trading rules were broken
+- **Suspicious Activity**: Account flagged for review
+- **Compliance Issue**: Verification or contract requirements not met
 - **Insufficient Trading Days**: Need more trading activity
-- **Waiting Period**: Too soon since last withdrawal
-- **Account Review**: Additional verification needed
-- **Amount Issue**: Requested amount not available
 
 ### What You Can Do
-1. **Review Reason**: Understand why declined
-2. **Contact Support**: Get clarification
+1. **Review Reason**: Read the rejection reason in your email carefully
+2. **Contact Support**: Get clarification if you believe it was an error
 3. **Meet Requirements**: Fulfill any missing criteria
-4. **Resubmit**: Try again when eligible
+4. **Resubmit**: Try again when eligible (if applicable)
+
+> **Important**: A rejected payout may include a balance deduction as a penalty. Check your account balance after receiving a rejection email.
+
+---
+
+## If Your Request Is Cancelled
+
+A cancellation is a neutral administrative action — no penalty is applied and your account balance is not affected. You can immediately resubmit.
+
+### Common Reasons
+- **Wrong Wallet Address**: Incorrect crypto wallet provided
+- **Incorrect Payment Details**: Bank or PayPal info was wrong
+- **Your Request**: You asked support to cancel it
+- **Administrative Correction**: Admin needed to void and redo
+
+### What You Can Do
+1. **Review Reason**: Check the cancellation reason in your email
+2. **Fix the Issue**: Correct your payment details
+3. **Resubmit Immediately**: Submit a new withdrawal request right away
 
 ## Managing Your Withdrawals
 

@@ -1,0 +1,25 @@
+{
+  "name": "pft-client-docs",
+  "version": "1.0.0",
+  "description": "Official documentation for PropFirmsTech platform",
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "keywords": [
+    "propfirmstech",
+    "trading",
+    "documentation"
+  ],
+  "author": "PropFirmsTech",
+  "license": "MIT",
+  "devDependencies": {
+    "vitepress": "^1.0.0"
+  },
+  "dependencies": {
+    "mermaid": "^11.12.2",
+    "vitepress-plugin-mermaid": "^2.0.17"
+  }
+}
