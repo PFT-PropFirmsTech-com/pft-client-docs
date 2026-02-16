@@ -1,0 +1,8 @@
+markdown: kramdown
+
+# Apply default layout to all pages
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default

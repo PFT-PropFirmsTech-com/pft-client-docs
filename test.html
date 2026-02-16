@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mermaid Test</title>
+</head>
+<body>
+  <h1>Mermaid Rendering Test</h1>
+
+  <div class="mermaid">
+    flowchart TD
+        Start([Test]) --> End([Success])
+        style Start fill:#e1f5e1
+        style End fill:#ccffcc
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({ startOnLoad: true });
+  </script>
+</body>
+</html>
