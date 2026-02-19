@@ -20,6 +20,7 @@ export default withMermaid({
           text: 'Client Documentation',
           items: [
             { text: 'Overview', link: '/client/' },
+            { text: 'Programs', link: '/client/programs' },
             { text: 'User Journey', link: '/client/user-journey' },
             { text: 'Account Purchase', link: '/client/account-purchase' },
             { text: 'Trading Experience', link: '/client/trading-experience' },
