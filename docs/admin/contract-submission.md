@@ -226,9 +226,9 @@ classDiagram
     class ContractType {
         <<enumeration>>
         contract
-        system-contract
-        created-by-admin
-        assigned-system
+        system_contract
+        created_by_admin
+        assigned_system
     }
 
     class SigningType {

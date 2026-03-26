@@ -176,10 +176,10 @@ flowchart TD
 mindmap
   root((Addons))
     Leverage
-      1:30
-      1:50
-      1:100
-      1:200
+      "1:30"
+      "1:50"
+      "1:100"
+      "1:200"
     Drawdown
       +2% Daily
       +5% Total
