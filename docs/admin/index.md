@@ -13,3 +13,4 @@ Internal technical documentation covering system flows, architecture, and proces
 - [Withdrawal Flow](/admin/withdrawal-flow) — Eligibility calculation, admin review, Rise payout, MT5 deduction
 - [Contract Submission](/admin/contract-submission) — Contract types, Adobe Sign, validation, approval flow
 - [Email Flows](/admin/email-flows) — All email events, triggers, templates, and provider config
+- [Trustpilot Reviews](/admin/trustpilot-reviews) — Setup Trustpilot review invitations, API config, trigger events, and analytics

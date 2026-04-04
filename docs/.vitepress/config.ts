@@ -44,7 +44,8 @@ export default withMermaid({
             { text: 'Pass & Progression', link: '/admin/pass-progression' },
             { text: 'Withdrawal Flow', link: '/admin/withdrawal-flow' },
             { text: 'Contract Submission', link: '/admin/contract-submission' },
-            { text: 'Email Flows', link: '/admin/email-flows' }
+            { text: 'Email Flows', link: '/admin/email-flows' },
+            { text: 'Trustpilot Reviews', link: '/admin/trustpilot-reviews' }
           ]
         }
       ]

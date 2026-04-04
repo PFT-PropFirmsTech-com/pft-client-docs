@@ -6,7 +6,7 @@ import { ref, computed, watch } from 'vue'
 const { Layout } = DefaultTheme
 const route = useRoute()
 
-const HASH = 'aa05c3c0718623fc4330c9295e963b43952573ae3bbff010623ecb1404bdd151'
+const HASH = '717875781d82794556777447ac24b4ce9997f3abab7a945a53d6bc5596e66c3b'
 const STORAGE_KEY = 'pft-admin-auth'
 
 const password = ref('')
