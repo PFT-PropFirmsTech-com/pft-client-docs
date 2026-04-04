@@ -8,8 +8,8 @@ const route = useRoute()
 
 // Add new password hashes here — any of them will unlock the admin docs
 const HASHES = [
-  '717875781d82794556777447ac24b4ce9997f3abab7a945a53d6bc5596e66c3b', // PFT-Admin-2026!
-  'ed01a26fcf902190f3a7bcb093b2f88cea7596d3faa40158a5d41737b19a8c9d', // PFT-Client-2026!
+  '67ece7f33d6d02bbc2f86fb9d6723d13698523eb322f3776cfe8bf3168cf6af6', // PFT-Admin-2026!
+  '48689e9681ddd6f6ac3a907519cd5a79edc73694f23b25cfa444041e244d1743', // PFT-Client-2026!
 ]
 const STORAGE_KEY = 'pft-admin-auth'
 
