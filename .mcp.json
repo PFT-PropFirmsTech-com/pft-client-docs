@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "propfirms-ticketing": {
+      "type": "sse",
+      "url": "https://mcp.propfirmstech.com/sse",
+      "headers": {
+        "Authorization": "Bearer mcp_client_60059746b538fef556a17d6e62c1e1ba8b5cb1b7b7f961903c06abeea4007f1f"
+      }
+    }
+  }
+}
