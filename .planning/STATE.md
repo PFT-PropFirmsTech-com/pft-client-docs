@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-06-28)
 ## Current Position
 
 Phase: 1 of 3 (Pre-Work)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-06-29 — Completed 01-01-fix-floating-pl.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-06-29 — Completed 01-02-add-leaderboard-opt-out.md
 
-Progress: [█████░░░░░] 50% (Phase 1)
+Progress: [██████████] 100% (Phase 1)
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Recent decisions affecting current work:
 - Architecture: CAS close pattern for competition close — prevents double winner determination
 - Architecture: Baseline snapshot per participant at competition start — rank by delta, not absolute value
 - 01-01: floatingPL MT5-offline fallback is deterministic 0 (not random) — keeps leaderboard ranks stable across requests
+- 01-02: leaderboardOptOut added via Mongoose `default: false` — no migration; `{ leaderboardOptOut: false }` is now a safe filter
 - Repo split: backend code commits land in nested `pft-backend` repo on `main-2026`; `.planning/` docs live in parent repo
 
 ### Pending Todos
@@ -56,10 +57,10 @@ None yet.
 ### Blockers/Concerns
 
 - PRE-01/PRE-02 must land before Phase 2 work — do not skip
-- leaderboardOptOut `{ $ne: true }` pattern is unsafe before migration completes; use `{ leaderboardOptOut: false }` only after PRE-02 migration confirmed
+- leaderboardOptOut schema default landed (01-02) — `{ leaderboardOptOut: false }` is now safe; schema must deploy from `main-2026` before leaderboard service relies on it at runtime
 
 ## Session Continuity
 
 Last session: 2026-06-29
-Stopped at: Completed 01-01 (floatingPL fix). Phase 1 plan 01-02 (leaderboard opt-out) is next.
-Resume file: .planning/phases/01-pre-work/01-02-add-leaderboard-opt-out.md
+Stopped at: Phase 1 (Pre-Work) complete — both 01-01 (floatingPL fix) and 01-02 (leaderboard opt-out) done. Ready to plan Phase 2.
+Resume file: None
