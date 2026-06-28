@@ -26,11 +26,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. Leaderboard rankings do not shuffle during MT5 downtime (floatingPL returns 0, not Math.random())
   2. User model has `leaderboardOptOut: Boolean` field with `default: false` and migration has applied to all existing users
   3. Querying `{ leaderboardOptOut: false }` correctly excludes only users who have opted out
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: Fix Math.random() floatingPL in leaderboard.service.ts (PRE-01)
-- [ ] 01-02: Add leaderboardOptOut to User schema + run migration (PRE-02)
+- [ ] 01-01-fix-floating-pl.md — Replace Math.random() floatingPL with deterministic 0 in leaderboard.service.ts (PRE-01)
+- [ ] 01-02-add-leaderboard-opt-out.md — Add leaderboardOptOut field to User schema and TUser interface (PRE-02)
 
 ### Phase 2: Public Leaderboard
 **Goal**: Any visitor can view a public leaderboard with masked trader identities; logged-in traders see full stats and can opt out
