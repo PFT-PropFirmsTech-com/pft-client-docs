@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-06-28)
 ## Current Position
 
 Phase: 1 of 3 (Pre-Work)
-Plan: — of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-06-28 — Roadmap created, ready to plan Phase 1
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-06-29 — Completed 01-01-fix-floating-pl.md
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████░░░░░] 50% (Phase 1)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: —
-- Total execution time: 0 hours
+- Total plans completed: 1
+- Average duration: ~3 min
+- Total execution time: <1 hour
 
 **By Phase:**
 
@@ -46,6 +46,8 @@ Recent decisions affecting current work:
 - Architecture: CompetitionEntry as separate collection (not embedded) — avoids 16MB BSON limit at 10k+ participants
 - Architecture: CAS close pattern for competition close — prevents double winner determination
 - Architecture: Baseline snapshot per participant at competition start — rank by delta, not absolute value
+- 01-01: floatingPL MT5-offline fallback is deterministic 0 (not random) — keeps leaderboard ranks stable across requests
+- Repo split: backend code commits land in nested `pft-backend` repo on `main-2026`; `.planning/` docs live in parent repo
 
 ### Pending Todos
 
@@ -58,6 +60,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-28
-Stopped at: Roadmap created. Phase 1 is ready to plan.
-Resume file: None
+Last session: 2026-06-29
+Stopped at: Completed 01-01 (floatingPL fix). Phase 1 plan 01-02 (leaderboard opt-out) is next.
+Resume file: .planning/phases/01-pre-work/01-02-add-leaderboard-opt-out.md
