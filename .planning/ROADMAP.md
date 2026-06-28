@@ -41,13 +41,13 @@ Plans:
   2. A logged-in trader sees account size, % growth, trading days, and profit factor in the full leaderboard view
   3. A trader can toggle "Hide me from leaderboard" in profile settings and immediately disappear from the public leaderboard
   4. The public leaderboard supports filtering by account size and challenge type, and sorting by % growth, win rate, and profit factor
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 02-01: New (public) Next.js route group + backend GET /leaderboard/public endpoint with toPublicDTO() serializer (LB-01)
-- [ ] 02-02: Logged-in full leaderboard view — extended stats, auth-gated backend response (LB-02)
-- [ ] 02-03: Opt-out toggle in trader profile settings (LB-03)
-- [ ] 02-04: Filtering and sorting on public leaderboard page (LB-04)
+- [ ] 02-01-public-endpoint-masked-dto.md — Backend GET /leaderboard/public with toPublicDTO() masking, funded-only + opt-out filters, optional-token richer stats (LB-01/LB-02 backend)
+- [ ] 02-02-public-page-and-components.md — Public /leaderboard page + slim components; masked anon view and richer logged-in view from one endpoint (LB-01, LB-02)
+- [ ] 02-03-opt-out-toggle.md — "Hide me from leaderboard" toggle in Settings via existing PATCH /users/:id (LB-03)
+- [ ] 02-04-filters-and-sorting.md — Account-size/challenge-type filters + sort by % growth/win rate/profit factor on public page (LB-04)
 
 ### Phase 3: Competition System
 **Goal**: Admins can run monthly prize pool competitions that auto-enroll eligible traders; public competition pages show live rankings and results
@@ -75,5 +75,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Pre-Work | 2/2 | ✓ Complete | 2026-06-29 |
-| 2. Public Leaderboard | 0/4 | Not started | - |
+| 2. Public Leaderboard | 0/4 | Planned | - |
 | 3. Competition System | 0/4 | Not started | - |
