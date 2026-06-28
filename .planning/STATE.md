@@ -12,9 +12,11 @@ See: .planning/PROJECT.md (updated 2026-06-28)
 Phase: 3 of 3 (Competition System)
 Plan: 01 of N in current phase
 Status: In progress
-Last activity: 2026-06-29 — Completed 03-01-competition-models-and-admin-crud.md (3 auto tasks; committed + pushed all 3 repos)
+Last activity: 2026-06-29 — Completed 03-02-activation-enrollment-baseline.md (2 auto tasks; committed + pushed pft-backend main-2026)
 
-Progress: [████] 100% (Phase 2 done) | Phase 3: 03-01 done
+Progress: [████] 100% (Phase 2 done) | Phase 3: 03-01, 03-02 done
+
+03-02: Activation auto-enroll + baseline snapshot + competition cron (pft-backend main-2026). enrollParticipants() writes ONE CompetitionEntry per funded (Program.programStage==="funded") non-opted-out account, baselineValueGrowth snapshot = Leaderboard.performance.valueGrowthPercentage; reuses leaderboard.service funded+opt-out query (no raw-User derivation); idempotent (skip if entries exist) + activation-only (no rolling enrollment). activate() now enrolls after draft→active flip. tickTransitions() = thin date dispatcher: due drafts → activate (enroll), due-active → closeIfDue() placeholder (03-04 fills CAS close + winners). CompetitionCronService (static class, isRunning guard, 5-min setInterval) registered server.ts:398 AFTER leaderboard cron block, NOT gated on MT5_CRONS_ENABLED. CAVEAT: cron not MT5-gated but the Leaderboard data it reads IS (leaderboard refresh gated MT5_CRONS_ENABLED) → enrollment/rankings stale/empty in non-prod. Deviation: User imported as default from ../Auth/auth.model (../User/user.model empty). Commit pft-backend 8dec4e3a, PUSHED; not deployed. 03-04 replaces closeIfDue() body.
 
 03-01: Competition foundation across 3 repos. pft-backend (main-2026): Competition model (draft|active|closing|ended|archived state machine, prizePool[], winners[] subdoc, locked valueGrowthPercentage metric, NO per-brand field) + SEPARATE CompetitionEntry collection + zod validation + admin CRUD (service/controller/routes) gated Auth(admin,backOffice), draft-only edit/delete guards, activate(draft→active)/deactivate(active→draft, blocked once entries exist), registered /competitions; admin reads under /competitions/admin (bare / + /:id/rankings reserved for 03-03). pft-dashboard (main-2026): competition.types + competitions ENDPOINTS + useCompetitions hooks + /admin/competitions page (table + Coupon-pattern modal, Edit/Delete disabled non-draft, Enable/Disable toggle) + sidebar entry. pfr-super-admin (main): /admin/competitions pagePermissions seed. Commits: pft-backend 2d7b8949 + 2a360a99, pft-dashboard 9e63857b, pfr-super-admin 69d3669. All PUSHED. activate() is the 03-02 enrollment hook point.
 
