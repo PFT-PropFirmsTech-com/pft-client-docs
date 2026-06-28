@@ -59,13 +59,13 @@ Plans:
   3. A public competition page shows the prize pool, a live countdown timer, and trader rankings sorted by % profit growth from the competition start date
   4. When a competition ends, the top 3 winners are determined by final % profit growth, the winner snapshot is recorded, and admin can view final standings and results
   5. Admin can enable/disable a competition and edit it while it remains in draft status
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 03-01: Competition and CompetitionEntry models + admin create/edit/enable-disable UI (COMP-01, COMP-02)
-- [ ] 03-02: Auto-enrollment cron/trigger on competition activation + baseline snapshot (COMP-03)
-- [ ] 03-03: Public competition page — prize pool, countdown, live rankings (COMP-04)
-- [ ] 03-04: Competition close — winner determination, CAS close pattern, results surface in admin (COMP-05, COMP-06)
+- [ ] 03-01-competition-models-and-admin-crud.md — Competition + CompetitionEntry models, admin CRUD module, admin UI, pagePermissions seed (COMP-01, COMP-02)
+- [ ] 03-02-activation-enrollment-baseline.md — Activation auto-enroll of funded non-opted-out accounts + baseline snapshot + competition cron (COMP-03)
+- [ ] 03-03-public-competition-page.md — Public competition pages + masked rankings endpoint (prize pool, countdown, delta rankings) (COMP-04)
+- [ ] 03-04-close-winner-determination.md — CAS close + winner determination (disqualify/dedupe) + admin results view (COMP-05, COMP-06)
 
 ## Progress
 
@@ -76,4 +76,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Pre-Work | 2/2 | ✓ Complete | 2026-06-29 |
 | 2. Public Leaderboard | 4/4 | ◆ Code complete (human-verify pending deploy) | 2026-06-29 |
-| 3. Competition System | 0/4 | Not started | - |
+| 3. Competition System | 0/4 | ◆ Planned | - |
