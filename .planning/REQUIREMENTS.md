@@ -54,10 +54,10 @@
 |-------------|-------|--------|
 | PRE-01 | Phase 1 | Complete |
 | PRE-02 | Phase 1 | Complete |
-| LB-01 | Phase 2 | Pending |
-| LB-02 | Phase 2 | Pending |
-| LB-03 | Phase 2 | Pending |
-| LB-04 | Phase 2 | Pending |
+| LB-01 | Phase 2 | Code complete (human-verify) |
+| LB-02 | Phase 2 | Code complete (human-verify) |
+| LB-03 | Phase 2 | Code complete (human-verify) |
+| LB-04 | Phase 2 | Code complete (human-verify) |
 | COMP-01 | Phase 3 | Pending |
 | COMP-02 | Phase 3 | Pending |
 | COMP-03 | Phase 3 | Pending |

@@ -75,5 +75,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Pre-Work | 2/2 | ✓ Complete | 2026-06-29 |
-| 2. Public Leaderboard | 0/4 | Planned | - |
+| 2. Public Leaderboard | 4/4 | ◆ Code complete (human-verify pending deploy) | 2026-06-29 |
 | 3. Competition System | 0/4 | Not started | - |
