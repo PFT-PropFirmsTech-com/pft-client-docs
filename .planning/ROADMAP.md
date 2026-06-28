@@ -12,7 +12,7 @@ This milestone adds a public-facing funded trader leaderboard and a monthly comp
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Pre-Work** - Fix Math.random() floatingPL bug and add leaderboardOptOut field to User model
+- [x] **Phase 1: Pre-Work** - Fix Math.random() floatingPL bug and add leaderboardOptOut field to User model
 - [ ] **Phase 2: Public Leaderboard** - Open leaderboard to anonymous and logged-in traders with PII masking and opt-out
 - [ ] **Phase 3: Competition System** - Admin competition management, auto-enrollment, public competition pages, and winner determination
 
@@ -74,6 +74,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Pre-Work | 0/2 | Not started | - |
+| 1. Pre-Work | 2/2 | ✓ Complete | 2026-06-29 |
 | 2. Public Leaderboard | 0/4 | Not started | - |
 | 3. Competition System | 0/4 | Not started | - |

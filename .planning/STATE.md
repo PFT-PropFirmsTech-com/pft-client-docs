@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-06-28)
 
 **Core value:** Funded traders rank and compete in monthly prize pool competitions
-**Current focus:** Phase 1 — Pre-Work
+**Current focus:** Phase 1 complete → Phase 2 (Public Leaderboard) next
 
 ## Current Position
 
@@ -19,7 +19,7 @@ Progress: [██████████] 100% (Phase 1)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
+- Total plans completed: 2
 - Average duration: ~3 min
 - Total execution time: <1 hour
 

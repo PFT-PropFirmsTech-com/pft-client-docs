@@ -52,8 +52,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PRE-01 | Phase 1 | Pending |
-| PRE-02 | Phase 1 | Pending |
+| PRE-01 | Phase 1 | Complete |
+| PRE-02 | Phase 1 | Complete |
 | LB-01 | Phase 2 | Pending |
 | LB-02 | Phase 2 | Pending |
 | LB-03 | Phase 2 | Pending |
