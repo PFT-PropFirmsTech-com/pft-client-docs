@@ -10,11 +10,13 @@ See: .planning/PROJECT.md (updated 2026-06-28)
 ## Current Position
 
 Phase: 2 of 3 (Public Leaderboard)
-Plan: 03 of 4 in current phase
+Plan: 02 of 4 in current phase
 Status: In progress
-Last activity: 2026-06-29 — Completed 02-03-opt-out-toggle.md (auto tasks; human-verify checkpoint pending live deploy)
+Last activity: 2026-06-29 — Completed 02-02-public-page-and-components.md (auto tasks; human-verify checkpoint deferred — app not deployed)
 
-Progress: [██░░] 50% (Phase 2: 02-01 + 02-03 done; 02-02, 02-04 pending)
+Progress: [███░] 75% (Phase 2: 02-01 + 02-02 + 02-03 done; 02-04 pending)
+
+02-02: Public leaderboard UI complete — /leaderboard page outside (dashboard) auth group, middleware-whitelisted; usePublicLeaderboard hook + slim PublicLeaderboardContainer/Table consuming GET /leaderboard/public; masked displayName only, richer columns (Account Size, Trading Days) conditional on logged-in fields; no PII/admin routing (grep clean). Committed pft-dashboard main-2026 (def211e8, f75af977); not deployed. Filter/sort slot reserved for 02-04.
 
 02-01: Public endpoint GET /leaderboard/public complete — masked DTO (no PII), funded-only + opt-out filters, optional-token richer stats, auth/anon cache buckets. Committed pft-backend main-2026 (9399ecc9, 586949ca); not deployed.
 
@@ -56,6 +58,10 @@ Recent decisions affecting current work:
 - 02-01: public masking is UNIVERSAL (anon + logged-in get "John D."); valid Bearer token unlocks only richer STAT fields, never identity
 - 02-01: public cache MUST bucket auth vs anon via `keyExtra` (route has no Auth, so `req.user` undefined → scope:user alone collapses all to "anon" and leaks richer stats)
 - 02-01: funded-only forced in service; opt-out applied query-time via `User.distinct` + `userId $nin`, merged field-wise with search `$in` through new `extraMatch` param on `getLeaderboard`
+- 02-02: public UI types added to existing `src/types/leaderboard.types.ts` (re-exported via `@/types`), not a new `leaderboard.ts`
+- 02-02: logged-in vs anon is DISPLAY-only — richer columns rendered from presence of richer stat fields in the response (apiClient auto-attaches token); never a branched fetch
+- 02-02: dedicated slim public components built (admin `LeaderboardTable` not reusable — renders email + pushes /admin/users); public surface is grep-clean of PII/admin routing
+- 02-02: `/leaderboard` whitelisted in middleware via `isLeaderboardPath` OR-clause; page lives outside `(dashboard)` auth group
 
 ### Pending Todos
 
@@ -70,5 +76,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-29
-Stopped at: Phase 2 plan 02-03 (opt-out toggle) auto tasks complete + committed in pft-dashboard (b96474dd, e1628f7f). human-verify checkpoint NOT run (app not deployed) — checklist recorded in 02-03-SUMMARY.md for later live verification.
-Resume file: .planning/phases/02-public-leaderboard/02-03-SUMMARY.md (human-verify checklist) — or proceed with 02-01/02-02/02-04.
+Stopped at: Phase 2 plan 02-02 (public page + components) auto tasks complete + committed in pft-dashboard (def211e8, f75af977). human-verify checkpoint NOT run (app not deployed) — checklist recorded in 02-02-SUMMARY.md for later live verification.
+Resume file: .planning/phases/02-public-leaderboard/02-02-SUMMARY.md (human-verify checklist) — or proceed with 02-04 (filters + sort UI into the reserved PublicLeaderboardContainer slot).
+Pending human-verify checklists: 02-02-SUMMARY.md + 02-03-SUMMARY.md (both await live deploy).
