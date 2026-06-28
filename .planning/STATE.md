@@ -10,11 +10,13 @@ See: .planning/PROJECT.md (updated 2026-06-28)
 ## Current Position
 
 Phase: 2 of 3 (Public Leaderboard)
-Plan: 02 of 4 in current phase
-Status: In progress
-Last activity: 2026-06-29 — Completed 02-02-public-page-and-components.md (auto tasks; human-verify checkpoint deferred — app not deployed)
+Plan: 04 of 4 in current phase
+Status: Phase complete (all auto tasks; human-verify checkpoints deferred — app not deployed)
+Last activity: 2026-06-29 — Completed 02-04-filters-and-sorting.md (auto tasks; human-verify checkpoint deferred — app not deployed)
 
-Progress: [███░] 75% (Phase 2: 02-01 + 02-02 + 02-03 done; 02-04 pending)
+Progress: [████] 100% (Phase 2: 02-01 + 02-02 + 02-03 + 02-04 done)
+
+02-04: Public leaderboard filters + sort complete — new PublicLeaderboardFilters (account-size + challenge-type selects sourced from data.filters.available*, sort-by % growth / win rate / profit factor + asc/desc toggle) lifted into PublicLeaderboardContainer state → usePublicLeaderboard params (page resets to 1 on change). LB-04 vs 02-01 contradiction RESOLVED: un-stripped challengeType in getPublicLeaderboard controller (option a) — safe because service forces programStage="funded" AFTER spreading caller filters, so challengeType only narrows within funded. Funded-only/masking/PII guarantees untouched; grep clean. Committed pft-dashboard main-2026 (74172f4b hook+types, 9f1cf5a0 filters+container) + pft-backend main-2026 (7e0acf28 controller); not deployed. human-verify checklist in 02-04-SUMMARY.md.
 
 02-02: Public leaderboard UI complete — /leaderboard page outside (dashboard) auth group, middleware-whitelisted; usePublicLeaderboard hook + slim PublicLeaderboardContainer/Table consuming GET /leaderboard/public; masked displayName only, richer columns (Account Size, Trading Days) conditional on logged-in fields; no PII/admin routing (grep clean). Committed pft-dashboard main-2026 (def211e8, f75af977); not deployed. Filter/sort slot reserved for 02-04.
 
@@ -23,8 +25,8 @@ Progress: [███░] 75% (Phase 2: 02-01 + 02-02 + 02-03 done; 02-04 pending
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: ~3 min
+- Total plans completed: 4 (Phase 2: 02-01–02-04)
+- Average duration: ~5 min
 - Total execution time: <1 hour
 
 **By Phase:**
@@ -62,6 +64,9 @@ Recent decisions affecting current work:
 - 02-02: logged-in vs anon is DISPLAY-only — richer columns rendered from presence of richer stat fields in the response (apiClient auto-attaches token); never a branched fetch
 - 02-02: dedicated slim public components built (admin `LeaderboardTable` not reusable — renders email + pushes /admin/users); public surface is grep-clean of PII/admin routing
 - 02-02: `/leaderboard` whitelisted in middleware via `isLeaderboardPath` OR-clause; page lives outside `(dashboard)` auth group
+- 02-04: LB-04 challengeType filter IS supported — resolved the 02-01 strip vs LB-04 contradiction by un-stripping challengeType in the public controller (option a). Safe because `getPublicLeaderboard` service spreads caller filters then sets `programStage: "funded"` AFTER → challengeType only narrows within funded, never widens. masking/toPublicDTO path untouched
+- 02-04: public filter/sort is container-owned state feeding usePublicLeaderboard (single source of truth); PublicLeaderboardFilters is presentational. Radix Select "All" uses a `__all__` sentinel (empty-string item values disallowed). Filter/sort change resets page→1
+- 02-04: challengeType dropdown options come from `Program.distinct("challengeType")` (all programs) — a listed type with no funded traders yields an empty table (cosmetic, no leak); could later narrow to funded-present types
 
 ### Pending Todos
 
@@ -76,6 +81,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-29
-Stopped at: Phase 2 plan 02-02 (public page + components) auto tasks complete + committed in pft-dashboard (def211e8, f75af977). human-verify checkpoint NOT run (app not deployed) — checklist recorded in 02-02-SUMMARY.md for later live verification.
-Resume file: .planning/phases/02-public-leaderboard/02-02-SUMMARY.md (human-verify checklist) — or proceed with 02-04 (filters + sort UI into the reserved PublicLeaderboardContainer slot).
-Pending human-verify checklists: 02-02-SUMMARY.md + 02-03-SUMMARY.md (both await live deploy).
+Stopped at: Phase 2 COMPLETE — plan 02-04 (filters + sort UI) auto tasks done + committed (pft-dashboard 74172f4b, 9f1cf5a0; pft-backend 7e0acf28, all main-2026). human-verify checkpoint NOT run (app not deployed) — checklist in 02-04-SUMMARY.md.
+Resume file: proceed to Phase 3 — OR run the pending Phase 2 human-verify checklists once a deploy is available.
+Pending human-verify checklists: 02-02-SUMMARY.md + 02-03-SUMMARY.md + 02-04-SUMMARY.md (all await live deploy).
