@@ -52,24 +52,24 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PRE-01 | TBD | Pending |
-| PRE-02 | TBD | Pending |
-| LB-01 | TBD | Pending |
-| LB-02 | TBD | Pending |
-| LB-03 | TBD | Pending |
-| LB-04 | TBD | Pending |
-| COMP-01 | TBD | Pending |
-| COMP-02 | TBD | Pending |
-| COMP-03 | TBD | Pending |
-| COMP-04 | TBD | Pending |
-| COMP-05 | TBD | Pending |
-| COMP-06 | TBD | Pending |
+| PRE-01 | Phase 1 | Pending |
+| PRE-02 | Phase 1 | Pending |
+| LB-01 | Phase 2 | Pending |
+| LB-02 | Phase 2 | Pending |
+| LB-03 | Phase 2 | Pending |
+| LB-04 | Phase 2 | Pending |
+| COMP-01 | Phase 3 | Pending |
+| COMP-02 | Phase 3 | Pending |
+| COMP-03 | Phase 3 | Pending |
+| COMP-04 | Phase 3 | Pending |
+| COMP-05 | Phase 3 | Pending |
+| COMP-06 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 12 total
-- Mapped to phases: 0 (roadmap pending)
-- Unmapped: 12 ⚠️
+- Mapped to phases: 12
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-28*
-*Last updated: 2026-06-28 after initial definition*
+*Last updated: 2026-06-28 — roadmap created, traceability complete*
