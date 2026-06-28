@@ -14,7 +14,9 @@ Plan: 03 of 4 in current phase
 Status: In progress
 Last activity: 2026-06-29 — Completed 02-03-opt-out-toggle.md (auto tasks; human-verify checkpoint pending live deploy)
 
-Progress: [██░░] 25% (Phase 2: 02-03 done; 02-01, 02-02, 02-04 pending)
+Progress: [██░░] 50% (Phase 2: 02-01 + 02-03 done; 02-02, 02-04 pending)
+
+02-01: Public endpoint GET /leaderboard/public complete — masked DTO (no PII), funded-only + opt-out filters, optional-token richer stats, auth/anon cache buckets. Committed pft-backend main-2026 (9399ecc9, 586949ca); not deployed.
 
 ## Performance Metrics
 
@@ -51,6 +53,9 @@ Recent decisions affecting current work:
 - Repo split: backend code commits land in nested `pft-backend` repo on `main-2026`; `.planning/` docs live in parent repo
 - 02-03: dashboard `User` type lives in `src/types/user.types.ts` (not `index.ts`); `leaderboardOptOut` added there + to `useUpdateUser` payload allow-list
 - 02-03: opt-out is frontend-only — `PATCH /users/:id` already self-updates `leaderboardOptOut` (raw findByIdAndUpdate, not in sensitive-strip)
+- 02-01: public masking is UNIVERSAL (anon + logged-in get "John D."); valid Bearer token unlocks only richer STAT fields, never identity
+- 02-01: public cache MUST bucket auth vs anon via `keyExtra` (route has no Auth, so `req.user` undefined → scope:user alone collapses all to "anon" and leaks richer stats)
+- 02-01: funded-only forced in service; opt-out applied query-time via `User.distinct` + `userId $nin`, merged field-wise with search `$in` through new `extraMatch` param on `getLeaderboard`
 
 ### Pending Todos
 
@@ -60,6 +65,7 @@ None yet.
 
 - PRE-01/PRE-02 must land before Phase 2 work — do not skip
 - leaderboardOptOut schema default landed (01-02) — `{ leaderboardOptOut: false }` is now safe; schema must deploy from `main-2026` before leaderboard service relies on it at runtime
+- 02-01 public endpoint committed on `pft-backend` main-2026 but NOT deployed; it reads `leaderboardOptOut` at runtime, so 01-02 schema + 02-01 code must both ship from main-2026 before the endpoint goes live
 
 ## Session Continuity
 
