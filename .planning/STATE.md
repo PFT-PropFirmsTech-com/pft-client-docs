@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-06-28)
 
 **Core value:** Funded traders rank and compete in monthly prize pool competitions
-**Current focus:** Phase 1 complete → Phase 2 (Public Leaderboard) next
+**Current focus:** Phase 2 deployed (human-verify pending) → Phase 3 (Competition System) planning
 
 ## Current Position
 
@@ -50,6 +50,8 @@ Recent decisions affecting current work:
 
 - Architecture: toPublicDTO() serializer built in same phase as LB-01 (Phase 2) — prevents PII leak
 - Architecture: CompetitionEntry as separate collection (not embedded) — avoids 16MB BSON limit at 10k+ participants
+- Architecture (Phase 3 REVERSAL): OMIT brandId on Competition — zero existing models carry it; multi-brand is per-DB separation. Supersedes earlier "brandId from day one" note.
+- Phase 3 decisions: disqualify BANNED/VIOLATED at close; per-account entry deduped to best account per user at win (top 3 = distinct users); rank by valueGrowthPercentage delta from activation baseline
 - Architecture: CAS close pattern for competition close — prevents double winner determination
 - Architecture: Baseline snapshot per participant at competition start — rank by delta, not absolute value
 - 01-01: floatingPL MT5-offline fallback is deterministic 0 (not random) — keeps leaderboard ranks stable across requests

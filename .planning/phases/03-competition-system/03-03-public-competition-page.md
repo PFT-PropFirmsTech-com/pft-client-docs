@@ -20,6 +20,36 @@ files_modified:
   - pft-dashboard/src/components/public-competition/CompetitionCountdown.tsx
   - pft-dashboard/src/components/public-competition/PublicCompetitionRankingsTable.tsx
 autonomous: false
+
+must_haves:
+  truths:
+    - "Public competition rankings expose masked names only ('John D.') — never email or full lastName, for anon AND logged-in viewers"
+    - "Opted-out traders (leaderboardOptOut=true) do not appear in public competition rankings"
+    - "Anonymous viewer never receives richer-stat payload cached for a logged-in viewer"
+    - "Live rank = current valueGrowthPercentage minus baselineValueGrowth (delta from activation), not absolute value"
+    - "Public competition page shows prize pool, a live countdown, and the rankings table"
+  artifacts:
+    - path: "pft-backend/src/app/modules/Competition/competition.service.ts"
+      provides: "Public competition rankings with toPublicDTO-style masking + opt-out re-filter + delta ranking"
+      contains: "baselineValueGrowth"
+    - path: "pft-backend/src/app/modules/Competition/competition.routes.ts"
+      provides: "Public rankings route with auth/anon cache bucket"
+      contains: "keyExtra"
+    - path: "pft-dashboard/src/middleware.ts"
+      provides: "/competitions allowlisted as public path"
+      contains: "isCompetitionsPath"
+    - path: "pft-dashboard/src/components/public-competition/CompetitionCountdown.tsx"
+      provides: "Live countdown timer to competition end"
+      contains: "CompetitionCountdown"
+  key_links:
+    - from: "competition.routes.ts public rankings route"
+      to: "cacheResponse auth/anon bucket"
+      via: "keyExtra based on Authorization header presence"
+      pattern: "keyExtra"
+    - from: "competition.service.ts public rankings"
+      to: "masked displayName output"
+      via: "toPublicDTO-style mapper (no email/lastName)"
+      pattern: "displayName"
 ---
 
 <objective>
