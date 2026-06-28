@@ -5,16 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-06-28)
 
 **Core value:** Funded traders rank and compete in monthly prize pool competitions
-**Current focus:** Phase 2 deployed (human-verify pending) → Phase 3 (Competition System) planning
+**Current focus:** Phase 3 (Competition System) in progress — 03-01 foundation done
 
 ## Current Position
 
-Phase: 2 of 3 (Public Leaderboard)
-Plan: 04 of 4 in current phase
-Status: Phase complete (all auto tasks; human-verify checkpoints deferred — app not deployed)
-Last activity: 2026-06-29 — Completed 02-04-filters-and-sorting.md (auto tasks; human-verify checkpoint deferred — app not deployed)
+Phase: 3 of 3 (Competition System)
+Plan: 01 of N in current phase
+Status: In progress
+Last activity: 2026-06-29 — Completed 03-01-competition-models-and-admin-crud.md (3 auto tasks; committed + pushed all 3 repos)
 
-Progress: [████] 100% (Phase 2: 02-01 + 02-02 + 02-03 + 02-04 done)
+Progress: [████] 100% (Phase 2 done) | Phase 3: 03-01 done
+
+03-01: Competition foundation across 3 repos. pft-backend (main-2026): Competition model (draft|active|closing|ended|archived state machine, prizePool[], winners[] subdoc, locked valueGrowthPercentage metric, NO per-brand field) + SEPARATE CompetitionEntry collection + zod validation + admin CRUD (service/controller/routes) gated Auth(admin,backOffice), draft-only edit/delete guards, activate(draft→active)/deactivate(active→draft, blocked once entries exist), registered /competitions; admin reads under /competitions/admin (bare / + /:id/rankings reserved for 03-03). pft-dashboard (main-2026): competition.types + competitions ENDPOINTS + useCompetitions hooks + /admin/competitions page (table + Coupon-pattern modal, Edit/Delete disabled non-draft, Enable/Disable toggle) + sidebar entry. pfr-super-admin (main): /admin/competitions pagePermissions seed. Commits: pft-backend 2d7b8949 + 2a360a99, pft-dashboard 9e63857b, pfr-super-admin 69d3669. All PUSHED. activate() is the 03-02 enrollment hook point.
 
 02-04: Public leaderboard filters + sort complete — new PublicLeaderboardFilters (account-size + challenge-type selects sourced from data.filters.available*, sort-by % growth / win rate / profit factor + asc/desc toggle) lifted into PublicLeaderboardContainer state → usePublicLeaderboard params (page resets to 1 on change). LB-04 vs 02-01 contradiction RESOLVED: un-stripped challengeType in getPublicLeaderboard controller (option a) — safe because service forces programStage="funded" AFTER spreading caller filters, so challengeType only narrows within funded. Funded-only/masking/PII guarantees untouched; grep clean. Committed pft-dashboard main-2026 (74172f4b hook+types, 9f1cf5a0 filters+container) + pft-backend main-2026 (7e0acf28 controller); not deployed. human-verify checklist in 02-04-SUMMARY.md.
 
@@ -25,7 +27,7 @@ Progress: [████] 100% (Phase 2: 02-01 + 02-02 + 02-03 + 02-04 done)
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4 (Phase 2: 02-01–02-04)
+- Total plans completed: 5 (Phase 2: 02-01–02-04; Phase 3: 03-01)
 - Average duration: ~5 min
 - Total execution time: <1 hour
 
@@ -83,6 +85,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-29
-Stopped at: Phase 2 COMPLETE — plan 02-04 (filters + sort UI) auto tasks done + committed (pft-dashboard 74172f4b, 9f1cf5a0; pft-backend 7e0acf28, all main-2026). human-verify checkpoint NOT run (app not deployed) — checklist in 02-04-SUMMARY.md.
-Resume file: proceed to Phase 3 — OR run the pending Phase 2 human-verify checklists once a deploy is available.
+Stopped at: Phase 3 plan 03-01 (competition models + admin CRUD + UI + pagePermissions seed) COMPLETE — all 3 auto tasks committed AND pushed (pft-backend main-2026 2d7b8949/2a360a99, pft-dashboard main-2026 9e63857b, pfr-super-admin main 69d3669).
+Resume file: proceed to Phase 3 plan 03-02 (enrollment + baseline snapshot — hooks into Competition activate()). 03-03 = public list/rankings; 03-04 = winner determination.
 Pending human-verify checklists: 02-02-SUMMARY.md + 02-03-SUMMARY.md + 02-04-SUMMARY.md (all await live deploy).
