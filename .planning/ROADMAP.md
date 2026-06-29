@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Pre-Work** - Fix Math.random() floatingPL bug and add leaderboardOptOut field to User model
 - [ ] **Phase 2: Public Leaderboard** - Open leaderboard to anonymous and logged-in traders with PII masking and opt-out
-- [ ] **Phase 3: Competition System** - Admin competition management, auto-enrollment, public competition pages, and winner determination
+- [x] **Phase 3: Competition System** - Admin competition management, auto-enrollment, public competition pages, and winner determination
 
 ## Phase Details
 
@@ -76,4 +76,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Pre-Work | 2/2 | ✓ Complete | 2026-06-29 |
 | 2. Public Leaderboard | 4/4 | ◆ Code complete (human-verify pending deploy) | 2026-06-29 |
-| 3. Competition System | 0/4 | ◆ Planned | - |
+| 3. Competition System | 4/4 | ◆ Code complete (human-verify pending deploy) | 2026-06-29 |

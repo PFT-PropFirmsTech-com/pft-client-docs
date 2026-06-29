@@ -58,12 +58,12 @@
 | LB-02 | Phase 2 | Code complete (human-verify) |
 | LB-03 | Phase 2 | Code complete (human-verify) |
 | LB-04 | Phase 2 | Code complete (human-verify) |
-| COMP-01 | Phase 3 | Pending |
-| COMP-02 | Phase 3 | Pending |
-| COMP-03 | Phase 3 | Pending |
-| COMP-04 | Phase 3 | Pending |
-| COMP-05 | Phase 3 | Pending |
-| COMP-06 | Phase 3 | Pending |
+| COMP-01 | Phase 3 | Code complete (human-verify) |
+| COMP-02 | Phase 3 | Code complete (human-verify) |
+| COMP-03 | Phase 3 | Code complete (human-verify) |
+| COMP-04 | Phase 3 | Code complete (human-verify) |
+| COMP-05 | Phase 3 | Code complete (human-verify) |
+| COMP-06 | Phase 3 | Code complete (human-verify) |
 
 **Coverage:**
 - v1 requirements: 12 total
