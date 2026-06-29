@@ -2,19 +2,21 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-28)
+See: .planning/PROJECT.md (updated 2026-06-29)
 
 **Core value:** Funded traders rank and compete in monthly prize pool competitions
-**Current focus:** Phase 3 (Competition System) in progress — 03-01 foundation done
+**Current focus:** v1.0 milestone complete — planning next milestone (`/gsd:new-milestone`)
 
 ## Current Position
 
-Phase: 3 of 3 (Competition System)
-Plan: 04 of 4 in current phase (FINAL)
-Status: Phase complete (all auto tasks; human-verify checklists deferred until deploy)
-Last activity: 2026-06-29 — Completed 03-04-close-winner-determination.md (FINAL plan; 2 auto tasks + 1 human-verify checkpoint deferred; committed + pushed pft-backend main-2026 2e914996 + pft-dashboard main-2026 1d1ececc)
+Phase: v1.0 SHIPPED (Phases 1-3 complete) — no active phase
+Plan: —
+Status: Ready to plan next milestone
+Last activity: 2026-06-29 — v1.0 milestone complete (archived + tagged)
 
-Progress: [████] 100% (Phase 2 done) | Phase 3: 03-01, 03-02, 03-03, 03-04 done (COMPLETE)
+Progress: [██████████] 100% — v1.0 Leaderboard & Competitions shipped (10/10 plans)
+
+**Open across milestone (post-deploy):** live human-verify checklists for Phases 2 & 3 (anon masking, opt-out timing, competition close, cache isolation) — run after main-2026 deploy. Tracked in phase SUMMARYs.
 
 03-04: Competition close + winner determination (COMP-05 + COMP-06). pft-backend (main-2026 2e914996): closeAndDetermineWinners(id) = THE single winner-write path — CAS gate findOneAndUpdate({_id,status:"active"},{status:"closing"},{new:true}); null => no-op return (already claimed / not active) — the ONLY guard against double winner determination. Ranks by final delta = current valueGrowthPercentage (Leaderboard collection) − baselineValueGrowth. Disqualifies THREE ban sources: Leaderboard.status in {BANNED,VIOLATED} + programs[].isBanned + top-level User.isBanned. Dedupe-by-user Map (best delta per user) => top N = N distinct users. Persists finalValueGrowth+delta on ALL entries (bulkWrite) for standings; marks winning entries rank+isWinner; writes winners[] snapshot; status->ended. Prize disbursement MANUAL (record-only, no payout/MT5). determineWinners(id) admin entry: ended/closing returns existing winners (idempotent, no recompute), active routes through CAS, else 400. getAdminResults(id): full-identity winners + full standings (populate firstName/lastName/email, sort delta desc) — NOT the public masked DTO. closeIfDue() cron hook now delegates to closeAndDetermineWinners (replaces 03-02 placeholder). Routes POST /:id/determine-winners + GET /admin/:id/results (Auth admin/backOffice). pft-dashboard (main-2026 1d1ececc): config determineWinners+adminResults endpoints; CompetitionAdmin{Winner,Standing,Results} full-name types; useDetermineWinners mutation + useCompetitionResults query; CompetitionResults.tsx (winners podium mirror of WeeklyPrizeWinners + full standings table, full names, in Dialog); CompetitionsTable "Determine winners" btn (past-end active, CAS-safe) + "Results" btn (ended); CompetitionContainer results modal + handler. Both PUSHED; NOT deployed. human-verify checklist in 03-04-SUMMARY.md (deferred — app not deployed).
 
