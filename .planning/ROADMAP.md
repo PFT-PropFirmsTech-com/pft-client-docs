@@ -130,4 +130,4 @@ Plans:
 | 5. Daily Profit Display Bug | ad-hoc | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 6. Funded Queue Ready Badge | ad-hoc | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 7. Used Margin Display | ad-hoc | 2/2 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
-| 8. Breach Email Template Vars | ad-hoc | 0/0 | Not planned | — |
+| 8. Breach Email Template Vars | ad-hoc | 1/1 | ✓ Complete (ops sync + verify pending deploy) | 2026-06-30 |
