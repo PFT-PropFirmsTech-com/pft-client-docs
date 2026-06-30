@@ -84,17 +84,18 @@ Plans:
 **Goal:** Surface a margin-usage metric (% of account balance) on both the client portal account view and the admin/backoffice account view, with a graphical representation. Tracks "all-in" / high-risk trading behaviour — one of the most common breach causes per Trading Cult.
 
 **Depends on:** Phase 4 (none functionally — sequential)
-**Plans:** 0 plans (run `/gsd:plan-phase 7` to break down)
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD — run `/gsd:plan-phase 7`
+- [ ] 07-01-PLAN.md — pft-rule-checker: extend accountrulestates with currentMarginUsedPercent + peakMarginUsedPercent; populate in ruleStateService per-tick block; verify EOD/payout/daily reset paths do NOT zero peak (zero pft-backend code change via strict:false passthrough)
+- [ ] 07-02-PLAN.md — pft-dashboard: new MarginUsageCard rendered in AccountInfoSection (one component, no role conditional — same widget for client + admin views); current % from live accountInfo socket (margin/equity*100, NOT marginLevel), peak % from accountrulestates; tooltip + edge-case handling + deferred post-deploy human-verify on Trading Cult
 
 **Details:**
 - Source ticket: [cmovizb320007qs0k0fue250p](https://portal.propfirmstech.com/admin/tickets/cmovizb320007qs0k0fue250p) (Trading Cult, BACKLOG)
-- Two metrics requested: (a) current margin used / equity %, (b) HIGHEST margin used % during account life (peak risk).
-- Bob already pointed Trading Cult at an existing risk-insights section (screenshot) — also need to enable that view for the backoffice role.
-- Scope: backend margin-usage tracking (live + historical peak from MT5 deals/positions), client account view widget, admin account view widget, role-permission enable.
-- Larger phase — likely 3-4 plans (data source, backend endpoint, client UI, admin UI).
+- Two metrics: (a) current margin used % = margin/equity*100 from live accountInfo socket (already delivered, just unrendered), (b) all-time PEAK margin used % persisted in accountrulestates via Math.max ratchet (mirrors existing peakTotalDrawdownPercent pattern at ruleStateService.ts:504-521).
+- One component (TradingDashboardShared -> AccountInfoSection -> MarginUsageCard) renders for BOTH client `/accounts/[id]/statistics/[mtacc]` AND admin `/admin/users/.../account/[accountId]` — no role conditional needed.
+- Bob's "enable Risk Intelligence for backoffice" ask is a Super Admin per-brand pagePermissions check on Trading Cult, NOT a code change (sidebar config already lists [admin, backOffice]) — flagged as operational follow-up, not in scope of these plans.
+- NO retroactive peak backfill; daily/EOD reset paths must NOT zero peak (audit included).
 
 ### Next milestone
 
@@ -110,5 +111,5 @@ Plans:
 | 4. Affiliate Reporting | v1.1 | 4/4 | ✓ Complete — audit gaps closed by Phase 4.1 | 2026-06-30 |
 | 4.1. Affiliate Reporting Bug Fixes (INSERTED) | v1.1-patch | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 5. Daily Profit Display Bug | ad-hoc | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
-| 6. Funded Queue Ready Badge | ad-hoc | 0/1 | Planned | — |
+| 6. Funded Queue Ready Badge | ad-hoc | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 7. Used Margin Display | ad-hoc | 0/0 | Not planned | — |
