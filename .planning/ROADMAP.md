@@ -97,6 +97,22 @@ Plans:
 - Bob's "enable Risk Intelligence for backoffice" ask is a Super Admin per-brand pagePermissions check on Trading Cult, NOT a code change (sidebar config already lists [admin, backOffice]) — flagged as operational follow-up, not in scope of these plans.
 - NO retroactive peak backfill; daily/EOD reset paths must NOT zero peak (audit included).
 
+### Phase 8: Breach Email Template Vars — Surface rule-checker reason
+
+**Goal:** Surface the rule-checker's detailed breach reason + timestamp on the breach emails so XPIPS admins stop fielding "why was I breached?" replies. The data is ALREADY passed to the email-template args at send time (verified live on XPIPS DB — `args.message`, `args.ban_reason`, `args.violation_details`, `args.breach_date`, 30+ fields total). What's missing: the `messagetemplates.variables` registry only declares 3 of them, so admins can't discover the rest in the template editor, and the seeded breach-template HTML body doesn't interpolate them.
+
+**Depends on:** None (independent — backend email-template seed + admin template edit)
+**Plans:** 0 plans (run `/gsd:plan-phase 8`)
+
+Plans:
+- [ ] TBD — run `/gsd:plan-phase 8`
+
+**Details:**
+- Source ticket: [cmr0ufshl00obny0kz3zk1uju](https://portal.propfirmstech.com/admin/tickets/cmr0ufshl00obny0kz3zk1uju) (XPIPS, LOW — but Aleksaserodi sick of replying with the same reason)
+- Reported example payload (live XPIPS emaillog): `"Tick-based breach: Equity $959.68 < Floor $960"` already arrives as `args.message` / `args.ban_reason` / `args.violation_details` — three identical aliases. Plus `args.breach_date`, `args.breach_type_label` ("Daily Drawdown Limit Exceeded"), `args.current_equity`, `args.breach_limit`, etc.
+- Fix shape: (a) extend the seeded `messagetemplates.variables` array on the 4 breach-related templates (`Rule Breached Template`, `Funded Account Breach`, `Leverage Exceeded Breach Template`, `inactivity breached email`) so admins see the available placeholders in the editor; (b) update the default HTML body for those templates to interpolate `{{ban_reason}}` + `{{breach_date}}` near the top; (c) one-off mongosh script per brand DB to sync existing templates without overwriting brand customisations.
+- Out of scope: changing what the rule-checker computes (the reason string is already canonical); changing the email layout/branding.
+
 ### Next milestone
 
 (None yet — run `/gsd:new-milestone` to define v1.2 / v2.0.)
@@ -112,4 +128,5 @@ Plans:
 | 4.1. Affiliate Reporting Bug Fixes (INSERTED) | v1.1-patch | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 5. Daily Profit Display Bug | ad-hoc | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 6. Funded Queue Ready Badge | ad-hoc | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
-| 7. Used Margin Display | ad-hoc | 0/0 | Not planned | — |
+| 7. Used Margin Display | ad-hoc | 2/2 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
+| 8. Breach Email Template Vars | ad-hoc | 0/0 | Not planned | — |
