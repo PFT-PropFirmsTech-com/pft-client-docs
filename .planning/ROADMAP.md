@@ -108,10 +108,11 @@ Plans:
 - [ ] TBD — run `/gsd:plan-phase 8`
 
 **Details:**
-- Source ticket: [cmr0ufshl00obny0kz3zk1uju](https://portal.propfirmstech.com/admin/tickets/cmr0ufshl00obny0kz3zk1uju) (XPIPS, LOW — but Aleksaserodi sick of replying with the same reason)
+- Primary ticket: [cmr0ufshl00obny0kz3zk1uju](https://portal.propfirmstech.com/admin/tickets/cmr0ufshl00obny0kz3zk1uju) (XPIPS, LOW — Aleksaserodi sick of replying with the same reason)
+- Related ticket: [cmqv8nmco006fny0kdrvlcugw](https://portal.propfirmstech.com/admin/tickets/cmqv8nmco006fny0kdrvlcugw) (Funding Optimal, HIGH — same root cause from a different angle: clients confused why account is breached when balance still shows above the daily limit. Account 900909555398 + 900909554665: balance $4,712 / $4,749 ABOVE floor $4,700 / $4,735, but tick-based EQUITY check fired when floating PnL pushed equity to $4,641 / $4,720 below floor before positions closed. UI labels drawdown type "Balance-Based" while the rule fires on equity — exact reason in the email closes the loop.)
 - Reported example payload (live XPIPS emaillog): `"Tick-based breach: Equity $959.68 < Floor $960"` already arrives as `args.message` / `args.ban_reason` / `args.violation_details` — three identical aliases. Plus `args.breach_date`, `args.breach_type_label` ("Daily Drawdown Limit Exceeded"), `args.current_equity`, `args.breach_limit`, etc.
 - Fix shape: (a) extend the seeded `messagetemplates.variables` array on the 4 breach-related templates (`Rule Breached Template`, `Funded Account Breach`, `Leverage Exceeded Breach Template`, `inactivity breached email`) so admins see the available placeholders in the editor; (b) update the default HTML body for those templates to interpolate `{{ban_reason}}` + `{{breach_date}}` near the top; (c) one-off mongosh script per brand DB to sync existing templates without overwriting brand customisations.
-- Out of scope: changing what the rule-checker computes (the reason string is already canonical); changing the email layout/branding.
+- Out of scope: changing what the rule-checker computes (the reason string is already canonical); changing the email layout/branding; Funding Optimal's deeper UX asks — option (a) make balance == equity at breach moment, option (b) force balance display below the limit. Those are systemic redesigns; ship Phase 8 first, measure whether the email reason reduces complaint volume, then decide if a Phase 9 UX overhaul is justified.
 
 ### Next milestone
 
