@@ -102,10 +102,10 @@ Plans:
 **Goal:** Surface the rule-checker's detailed breach reason + timestamp on the breach emails so XPIPS admins stop fielding "why was I breached?" replies. The data is ALREADY passed to the email-template args at send time (verified live on XPIPS DB — `args.message`, `args.ban_reason`, `args.violation_details`, `args.breach_date`, 30+ fields total). What's missing: the `messagetemplates.variables` registry only declares 3 of them, so admins can't discover the rest in the template editor, and the seeded breach-template HTML body doesn't interpolate them.
 
 **Depends on:** None (independent — backend email-template seed + admin template edit)
-**Plans:** 0 plans (run `/gsd:plan-phase 8`)
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD — run `/gsd:plan-phase 8`
+- [ ] 08-01-PLAN.md — Patch rule_breached seed (body + variables) + per-brand sync script
 
 **Details:**
 - Primary ticket: [cmr0ufshl00obny0kz3zk1uju](https://portal.propfirmstech.com/admin/tickets/cmr0ufshl00obny0kz3zk1uju) (XPIPS, LOW — Aleksaserodi sick of replying with the same reason)
