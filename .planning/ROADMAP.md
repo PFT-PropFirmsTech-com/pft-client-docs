@@ -68,10 +68,10 @@ Plans:
 **Goal:** Add a red-dot notification badge on the admin sidebar (Program Management → Funded Queue) that lights up when there are pending funded-queue entries where BOTH KYC AND contract are already approved — i.e. accounts truly ready for admin "Force Process" review. Helps the ops team triage the queue without scanning every row.
 
 **Depends on:** Phase 4 (none functionally — sequential)
-**Plans:** 0 plans (run `/gsd:plan-phase 6` to break down)
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD — run `/gsd:plan-phase 6`
+- [ ] 06-01-PLAN.md — Backend /funded-queue/ready-count endpoint + dashboard useAdminSidebarPending extension (5-min poll, toggle-gated, live-compute Kyc+Contract joins) + deferred post-deploy human-verify
 
 **Details:**
 - Source ticket: [cmqt9rtjl002rny0kkawu1c6y](https://portal.propfirmstech.com/admin/tickets/cmqt9rtjl002rny0kkawu1c6y) (Trading Cult, HIGH)
@@ -107,8 +107,8 @@ Plans:
 | 1. Pre-Work | v1.0 | 2/2 | ✓ Complete | 2026-06-29 |
 | 2. Public Leaderboard | v1.0 | 4/4 | ✓ Complete (human-verify pending deploy) | 2026-06-29 |
 | 3. Competition System | v1.0 | 4/4 | ✓ Complete (human-verify pending deploy) | 2026-06-29 |
-| 4. Affiliate Reporting | v1.1 | 4/4 | ✓ Complete — ⚠ gaps_found (see [audit](v1.1-MILESTONE-AUDIT.md)) | 2026-06-30 |
-| 4.1. Affiliate Reporting Bug Fixes (INSERTED) | v1.1-patch | 0/1 | Planned | — |
+| 4. Affiliate Reporting | v1.1 | 4/4 | ✓ Complete — audit gaps closed by Phase 4.1 | 2026-06-30 |
+| 4.1. Affiliate Reporting Bug Fixes (INSERTED) | v1.1-patch | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 5. Daily Profit Display Bug | ad-hoc | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
-| 6. Funded Queue Ready Badge | ad-hoc | 0/0 | Not planned | — |
+| 6. Funded Queue Ready Badge | ad-hoc | 0/1 | Planned | — |
 | 7. Used Margin Display | ad-hoc | 0/0 | Not planned | — |
