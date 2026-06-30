@@ -9,14 +9,16 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 
 ## Current Position
 
-Phase: 04-affiliate-reporting — Plan 01 complete (of 4)
-Plan: 04-01 complete; next: 04-02
+Phase: 04-affiliate-reporting — Plan 03 complete (of 4)
+Plan: 04-03 complete; next: 04-04
 Status: In progress
-Last activity: 2026-06-30 — Completed 04-01-PLAN.md (affiliate reporting backend endpoints)
+Last activity: 2026-06-30 — Completed 04-03-PLAN.md (affiliate columns in admin Payment History CSV)
 
-Progress: v1.0 [██████████] 100% (10/10 shipped) · Phase 04 [██░░░░░░░░] 25% (1/4 plans)
+Progress: v1.0 [██████████] 100% (10/10 shipped) · Phase 04 [████████░░] 75% (3/4 plans)
 
 **Open across milestone (post-deploy):** live human-verify checklists for Phases 2 & 3 (anon masking, opt-out timing, competition close, cache isolation) — run after main-2026 deploy. Tracked in phase SUMMARYs.
+
+04-03: Admin Payment History CSV export now ships affiliate commission columns (pft-dashboard main-2026). `ENDPOINTS.admin.affiliate.bulkCommissionsByOrders` added next to existing `commissionsByOrder` per-order lookup, pointing at Plan 04-01's `POST /affiliates/admin/commissions/bulk-by-orders`. `useExportPaymentsCsv` inserts ONE bulk POST `{orderIds: payments.map(p._id)}` (NOT N+1 per-row GETs — would also blow URL-length limit) between the lean payment fetch (skipEnrichment=true UNCHANGED) and the row-map; merges results client-side. CSV grew 19→25 columns: + Commission Rate (%) / Amount (USD) / Currency / Affiliate User ID / Affiliate Name / Affiliate Email at the tail (original 19 untouched). For MLM payments with multi-tier entries, lowest tier (tier 1 = direct referrer) wins per row via `.sort((a,b)=>(a.tier??1)-(b.tier??1))[0]`. Commission fetch wrapped in try/catch → `commByOrder={}` on failure, affiliate columns render empty but CSV still downloads (graceful degrade, no broken export). 2 atomic commits pft-dashboard main-2026: 97783483 (endpoint wiring) + 6566f16d (hook columns); PUSHED to origin; NOT deployed. No deviations. Verifies post-deploy: Network tab shows exactly 1 bulk-by-orders POST per export; CSV has 25 cols; payments with no commission show empty strings not "undefined".
 
 04-01: Affiliate reporting backend endpoints (pft-backend main-2026). Two new routes for the Phase 4 affiliate-reporting UI work. `POST /affiliates/admin/commissions/bulk-by-orders` (Auth admin/backOffice/sales) — one `AffiliateCommission.find({orderId:{$in}})` query grouped into `Record<orderId, entry[]>` for the admin Payment History CSV export (unblocks Plan 03). `GET /affiliates/my-commissions` (Auth `userRole.user` ONLY — security-critical, no admin/backOffice/sales so the service can never be silently changed to accept an override userId) — paginated commission rows scoped to `req.user._id`, batched Payment join via `Promise.all` (not sequential await in .map, matches getAdminUserCommissions perf), surfaces `payment.mt5Login` when set; unblocks Plan 04 Purchase Report UI. Service funcs: `getCommissionsBulkByOrders(orderIds)` + `getMyCommissions(userId, {page,limit,tier,sortBy,sortOrder})` inserted between `getCommissionsByOrderId` and `selectLevelIndexByThreshold` in affiliate.service.ts; controllers + exports in `AffiliateController`. No deviations — plan was surgical and executed exactly as written. Pre-existing tsc errors (esModuleInterop config, Request.user typing across all controllers) NOT touched — they affect every controller, not the new code. Commits: pft-backend e136636c (service) + 63f7d44a (controller+routes), PUSHED to origin/main-2026; NOT deployed. Routes go live when main-2026 deploys.
 
