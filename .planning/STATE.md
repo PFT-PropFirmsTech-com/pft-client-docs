@@ -9,14 +9,16 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 
 ## Current Position
 
-Phase: v1.0 SHIPPED (Phases 1-3 complete) — no active phase
-Plan: —
-Status: Ready to plan next milestone
-Last activity: 2026-06-29 — v1.0 milestone complete (archived + tagged)
+Phase: 04-affiliate-reporting — Plan 01 complete (of 4)
+Plan: 04-01 complete; next: 04-02
+Status: In progress
+Last activity: 2026-06-30 — Completed 04-01-PLAN.md (affiliate reporting backend endpoints)
 
-Progress: [██████████] 100% — v1.0 Leaderboard & Competitions shipped (10/10 plans)
+Progress: v1.0 [██████████] 100% (10/10 shipped) · Phase 04 [██░░░░░░░░] 25% (1/4 plans)
 
 **Open across milestone (post-deploy):** live human-verify checklists for Phases 2 & 3 (anon masking, opt-out timing, competition close, cache isolation) — run after main-2026 deploy. Tracked in phase SUMMARYs.
+
+04-01: Affiliate reporting backend endpoints (pft-backend main-2026). Two new routes for the Phase 4 affiliate-reporting UI work. `POST /affiliates/admin/commissions/bulk-by-orders` (Auth admin/backOffice/sales) — one `AffiliateCommission.find({orderId:{$in}})` query grouped into `Record<orderId, entry[]>` for the admin Payment History CSV export (unblocks Plan 03). `GET /affiliates/my-commissions` (Auth `userRole.user` ONLY — security-critical, no admin/backOffice/sales so the service can never be silently changed to accept an override userId) — paginated commission rows scoped to `req.user._id`, batched Payment join via `Promise.all` (not sequential await in .map, matches getAdminUserCommissions perf), surfaces `payment.mt5Login` when set; unblocks Plan 04 Purchase Report UI. Service funcs: `getCommissionsBulkByOrders(orderIds)` + `getMyCommissions(userId, {page,limit,tier,sortBy,sortOrder})` inserted between `getCommissionsByOrderId` and `selectLevelIndexByThreshold` in affiliate.service.ts; controllers + exports in `AffiliateController`. No deviations — plan was surgical and executed exactly as written. Pre-existing tsc errors (esModuleInterop config, Request.user typing across all controllers) NOT touched — they affect every controller, not the new code. Commits: pft-backend e136636c (service) + 63f7d44a (controller+routes), PUSHED to origin/main-2026; NOT deployed. Routes go live when main-2026 deploys.
 
 03-04: Competition close + winner determination (COMP-05 + COMP-06). pft-backend (main-2026 2e914996): closeAndDetermineWinners(id) = THE single winner-write path — CAS gate findOneAndUpdate({_id,status:"active"},{status:"closing"},{new:true}); null => no-op return (already claimed / not active) — the ONLY guard against double winner determination. Ranks by final delta = current valueGrowthPercentage (Leaderboard collection) − baselineValueGrowth. Disqualifies THREE ban sources: Leaderboard.status in {BANNED,VIOLATED} + programs[].isBanned + top-level User.isBanned. Dedupe-by-user Map (best delta per user) => top N = N distinct users. Persists finalValueGrowth+delta on ALL entries (bulkWrite) for standings; marks winning entries rank+isWinner; writes winners[] snapshot; status->ended. Prize disbursement MANUAL (record-only, no payout/MT5). determineWinners(id) admin entry: ended/closing returns existing winners (idempotent, no recompute), active routes through CAS, else 400. getAdminResults(id): full-identity winners + full standings (populate firstName/lastName/email, sort delta desc) — NOT the public masked DTO. closeIfDue() cron hook now delegates to closeAndDetermineWinners (replaces 03-02 placeholder). Routes POST /:id/determine-winners + GET /admin/:id/results (Auth admin/backOffice). pft-dashboard (main-2026 1d1ececc): config determineWinners+adminResults endpoints; CompetitionAdmin{Winner,Standing,Results} full-name types; useDetermineWinners mutation + useCompetitionResults query; CompetitionResults.tsx (winners podium mirror of WeeklyPrizeWinners + full standings table, full names, in Dialog); CompetitionsTable "Determine winners" btn (past-end active, CAS-safe) + "Results" btn (ended); CompetitionContainer results modal + handler. Both PUSHED; NOT deployed. human-verify checklist in 03-04-SUMMARY.md (deferred — app not deployed).
 
@@ -88,6 +90,9 @@ Recent decisions affecting current work:
 - 03-04: winner disqualification checks THREE ban sources — Leaderboard.status in {BANNED,VIOLATED}, programs[].isBanned, AND top-level User.isBanned (strict superset of the plan's named sources)
 - 03-04: `finalValueGrowth` + `delta` are persisted on ALL CompetitionEntry rows at close (not just winners) so the admin standings table renders the full board; dedupe-by-user keeps each user's highest-delta eligible entry → top N = N distinct users
 - 03-04: admin results read their OWN full-identity data (firstName/lastName/email via populate) through `GET /admin/:id/results` + `getAdminResults` — NEVER the public masked `toPublicRankingDTO`. `determineWinners` on an already-ended/closing competition returns existing winners WITHOUT recompute (idempotent)
+- 04-01: `/affiliates/my-commissions` is locked to `Auth(userRole.user)` ONLY. Admin/backOffice/sales deliberately excluded — service derives userId from `req.user._id`, so adding admin roles would either show admins only their own commissions (confusing UX) or, worse, set up a silent privilege-bypass regression if the service is later refactored to accept an override userId. Route file carries a comment documenting this so it doesn't get "fixed" later
+- 04-01: bulk-by-IDs lookup pattern — `POST` with `{ orderIds: string[] }` body, returns `Record<orderId, entry[]>` from a single `$in` query; caller pivots client-side. Avoids N round-trips when admin exports hundreds of payments
+- 04-01: paginated-with-Payment-join pattern uses `Promise.all` over `Payment.findById` calls (NOT sequential await in `.map`) — matches `getAdminUserCommissions` perf; sequential await across page-size rows is the regression to guard against in code review
 
 ### Pending Todos
 
