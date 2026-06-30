@@ -29,6 +29,24 @@ Full detail: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
 
 ### Active (ad-hoc, post-v1.1)
 
+### Phase 4.1: Affiliate Reporting Bug Fixes (INSERTED)
+
+**Goal:** Close the 3 gaps surfaced by client reopen of source ticket cmqqchwh500bspi0kxw23o2rl (audit: `.planning/v1.1-MILESTONE-AUDIT.md`, status `gaps_found`). All 3 are intra-component dashboard bugs; backend contracts hold. Patch is unambiguously a v1.1 follow-up, not v1.2 forward work.
+
+**Depends on:** Phase 4 (v1.1 — patches the same files)
+**Plans:** 1 plan
+
+Plans:
+- [ ] 04.1-01-PLAN.md — Fix 3 affiliate-reporting bugs (CSV tier sum, row currency, accountSize parse) + deferred post-deploy human-verify
+
+**Details:**
+- Source ticket: [cmqqchwh500bspi0kxw23o2rl](https://portal.propfirmstech.com/admin/tickets/cmqqchwh500bspi0kxw23o2rl) (Trading Cult, reopened OPEN, HIGH)
+- Audit: [.planning/v1.1-MILESTONE-AUDIT.md](v1.1-MILESTONE-AUDIT.md) — full reproduction of all 3 bugs against live code + screenshot
+- **Bug 1 (CSV multi-tier):** `pft-dashboard/src/hooks/usePayments.ts:337-342` uses tier-1-only for MLM commissions; client wants SUM across tiers. v1.1 archive Key Decisions explicitly recorded the tier-1-only choice — wrong scope.
+- **Bug 2 (Commission Amount wrong figure + currency):** `pft-dashboard/src/app/(dashboard)/_components/modules/users/affiliates/AffiliatesContainer.tsx:407-415` page-level `formatCurrency(amount)` IGNORES caller's currency arg, hard-codes `activeSettings.currency` (JPY on TradingCult). Plan called `formatCurrency(r.amount, r.currency)` expecting 2-arg signature — silently discarded. USD `amount: 1.25` renders as `¥1` (JPY 0-decimals).
+- **Bug 3 (Product `twoStep $NaN`):** `AffiliatesContainer.tsx:178,743` does `Number(accountSize).toLocaleString()` on string `"5k"` → NaN. Need `parseAccountSize` regex helper (mirror backend `parseAccountSizeValue` in `accountSize.utils.ts`).
+- Likely single-plan, single-file (one cross-component patch + one helper) — execute fast.
+
 ### Phase 5: Daily Profit Display Bug — Account 13535
 
 **Goal:** Fix the dashboard Daily P&L Calendar widget so it reports correct daily profit per account/day. Root cause (per RESEARCH.md): `mergedFromDeals` in `pft-dashboard/src/hooks/useTradingDashboardData.ts` silently drops orphan CLOSE deals (close whose matching open isn't in the loaded buffer). Account 13535 / 2026-06-18: dropped -$34.69 orphan → reports $54.85 ("+$55") instead of true $20.16. Fix: emit a synthetic closed row for orphan closes.
@@ -89,7 +107,8 @@ Plans:
 | 1. Pre-Work | v1.0 | 2/2 | ✓ Complete | 2026-06-29 |
 | 2. Public Leaderboard | v1.0 | 4/4 | ✓ Complete (human-verify pending deploy) | 2026-06-29 |
 | 3. Competition System | v1.0 | 4/4 | ✓ Complete (human-verify pending deploy) | 2026-06-29 |
-| 4. Affiliate Reporting | v1.1 | 4/4 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
-| 5. Daily Profit Display Bug | ad-hoc | 0/1 | Planned | — |
+| 4. Affiliate Reporting | v1.1 | 4/4 | ✓ Complete — ⚠ gaps_found (see [audit](v1.1-MILESTONE-AUDIT.md)) | 2026-06-30 |
+| 4.1. Affiliate Reporting Bug Fixes (INSERTED) | v1.1-patch | 0/1 | Planned | — |
+| 5. Daily Profit Display Bug | ad-hoc | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 6. Funded Queue Ready Badge | ad-hoc | 0/0 | Not planned | — |
 | 7. Used Margin Display | ad-hoc | 0/0 | Not planned | — |
