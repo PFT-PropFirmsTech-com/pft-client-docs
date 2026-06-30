@@ -2,21 +2,21 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-29)
+See: .planning/PROJECT.md (updated 2026-06-30)
 
-**Core value:** Funded traders rank and compete in monthly prize pool competitions
-**Current focus:** v1.0 milestone complete — planning next milestone (`/gsd:new-milestone`)
+**Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown; admins reconcile commissions in Payment History CSV.
+**Current focus:** v1.1 milestone complete — planning next milestone (`/gsd:new-milestone`)
 
 ## Current Position
 
-Phase: 04-affiliate-reporting — Plan 04 complete (of 4) — PHASE COMPLETE
-Plan: 04-04 complete; phase 04 feature-complete (pending post-deploy verify)
-Status: Phase complete
-Last activity: 2026-06-30 — Completed 04-04-PLAN.md (Purchase Report UI on Affiliate Overview page)
+Phase: v1.0 + v1.1 SHIPPED (Phases 1-4 complete) — no active phase
+Plan: —
+Status: Ready to plan next milestone
+Last activity: 2026-06-30 — v1.1 Affiliate Reporting milestone archived + tagged
 
-Progress: v1.0 [██████████] 100% (10/10 shipped) · Phase 04 [██████████] 100% (4/4 plans)
+Progress: v1.0 [██████████] 100% (10/10 plans) · v1.1 [██████████] 100% (4/4 plans)
 
-**Open across milestone (post-deploy):** live human-verify checklists for Phases 2, 3 & 4 (anon masking, opt-out timing, competition close, cache isolation, purchase-report card render + CSV export) — run after main-2026 deploy. Tracked in phase SUMMARYs.
+**Open across both milestones (post-deploy):** v1.0 live human-verify (Phases 2 & 3 — anon masking, opt-out, competition close, cache isolation) + v1.1 live human-verify (Phase 4 — Purchase Report card render, Export CSV downloads, showOverview-only scoping, 6 admin CSV cols populated, single-POST network pattern). All gated on next main-2026 deploy. Tracked in phase SUMMARYs.
 
 04-04: Affiliate Overview page now ships a "Purchase Report" card below "Your Referrals" (above Payout History) inside the showOverview branch only — NOT on the Withdrawals view. Pulls from the GET /affiliates/my-commissions route shipped by 04-01 (Auth userRole.user, server-scoped to req.user._id). MLM/Hybrid affiliates get Tier 1/2/3 tabs (mirrors the existing Referrals tabs using `tigerTab + tabHoverTeal + tabActiveTeal` theme classes); Standard affiliates get a flat 8-column table. Columns: Client Name / Client Email / Trading Account # (payment.mt5Login or "—") / Product (challengeType + accountSize) / Date (locale) / Purchase Amount (currency-formatted) / Commission % / Commission Amount (in row's OWN currency via inline Intl formatter — commission currency can differ from brand currency, e.g. JPY payment → USD commission). Single useGetMyCommissions React Query hook keyed on `activePurchaseTier = Number(purchaseReportTab.replace("tier-",""))` — derived state keeps hook order stable across MLM/Standard variants (no conditional hooks). `PurchaseReportTable` declared at MODULE scope above AffiliateContainer to dodge the render-time component-inside-component remount footgun. Export CSV button → `apiClient.get(/affiliates/my-commissions?page=1&limit=0[&tier=N])` → 9-column CSV via file-saver with UTF-8 BOM (8 visible + Commission Currency as the 9th); filename `purchase-report[-tier-N]-YYYY-MM-DD.csv`. 13 new translation keys added to `messages/en.json` under `dashboard.affiliates.*` (purchaseReport, purchaseReportDescription, noPurchaseReportData, purchaseReportEmptyDescription, purchaseReportExportFailed, clientName, clientEmail, tradingAccount, product, purchaseAmount, commissionPct, commissionAmount, date) + 1 key to root `common.exportCsv` (used by `tc("exportCsv")`); `ja.json` deliberately NOT updated (falls back to key string — JA owned by separate `feat/email-qa-and-ja-localization` branch, matches 02-02/03-03/03-04 convention). Deviations: (1) `theme.classes.buttonSecondary` doesn't exist → used `buttonOutlinePrimary`; (2) next-intl `Translator` invariant generics rejected the prop signature → relaxed prop typing to `t: any` with eslint-disable comment; (3) `common.exportCsv` missing → added to ROOT common (not dashboard.common) because `tc` is wired to root; (4) dropped the `setPurchaseReportPage` setter (no pagination UI in scope — Referrals card is also unpaginated). All inline-fixes, no architectural changes. tsc clean on touched files (project tsc reports 259 pre-existing errors in `.next/types`, `scripts/migration/*`, `CheckoutEditorContainer` — none in our 4 files). 2 atomic commits pft-dashboard main-2026: fc6e4361 (endpoint config + hook + type) + 35337a41 (UI card + CSV export + translation keys); PUSHED to origin (6566f16d..35337a41); NOT deployed. Task 3 human-verify DEFERRED per objective (no dev server start). Verifies post-deploy on TradingCult (22 commission rows confirmed live across tiers 1/2/3): card renders below Your Referrals, MLM tabs filter via tier query param refetch, 9-column CSV opens cleanly in Excel, NOT visible on Withdrawals page.
 

@@ -3,6 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 Leaderboard & Competitions** — Phases 1-3, 10 plans (shipped 2026-06-29) → [archive](milestones/v1.0-ROADMAP.md)
+- ✅ **v1.1 Affiliate Reporting** — Phase 4, 4 plans (shipped 2026-06-30, ad-hoc) → [archive](milestones/v1.1-ROADMAP.md)
 
 ## Phases
 
@@ -17,21 +18,18 @@ Full detail: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 </details>
 
-### Phase 4: Affiliate Reporting Enhancements (ad-hoc, ticket cmqqchwh500bspi0kxw23o2rl)
+<details>
+<summary>✅ v1.1 Affiliate Reporting (Phase 4, ad-hoc) — SHIPPED 2026-06-30</summary>
 
-**Goal:** Deliver three affiliate reporting enhancements — affiliate commission columns in the Payment History CSV export, a ticket clarification on Payout vs Withdrawal History, and a new Purchase Report section in My Affiliate showing per-purchase commission breakdown by tier with CSV export.
+- [x] Phase 4: Affiliate Reporting Enhancements (4/4 plans) — backend bulk+my-commissions endpoints, ticket clarification reply, Payment History CSV affiliate columns, Purchase Report card with per-tier tabs + CSV export. Source ticket: [cmqqchwh500bspi0kxw23o2rl](https://portal.propfirmstech.com/admin/tickets/cmqqchwh500bspi0kxw23o2rl) (Trading Cult).
 
-**Plans:** 4 plans
+Full detail: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
 
-Plans:
-- [ ] 04-01-PLAN.md — Backend: bulk-by-orders endpoint + user-facing my-commissions endpoint (Wave 1)
-- [ ] 04-02-PLAN.md — Ticket reply: Payout History vs Withdrawal History clarification (Wave 1, parallel)
-- [ ] 04-03-PLAN.md — Dashboard: add 6 affiliate columns to Payment History CSV export (Wave 2)
-- [ ] 04-04-PLAN.md — Dashboard: Purchase Report card in Affiliate Overview with tier tabs + CSV export (Wave 3)
+</details>
 
 ### Next milestone
 
-(None yet — run `/gsd:new-milestone` to define v1.1/v2.0.)
+(None yet — run `/gsd:new-milestone` to define v1.2 / v2.0.)
 
 ## Progress
 
@@ -40,4 +38,4 @@ Plans:
 | 1. Pre-Work | v1.0 | 2/2 | ✓ Complete | 2026-06-29 |
 | 2. Public Leaderboard | v1.0 | 4/4 | ✓ Complete (human-verify pending deploy) | 2026-06-29 |
 | 3. Competition System | v1.0 | 4/4 | ✓ Complete (human-verify pending deploy) | 2026-06-29 |
-| 4. Affiliate Reporting | ad-hoc | 0/4 | In progress | — |
+| 4. Affiliate Reporting | v1.1 | 4/4 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
