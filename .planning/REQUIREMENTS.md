@@ -81,9 +81,9 @@ Partner's exact postback spec (macro param names beyond `clickid`/`goal`/`payout
 
 **Coverage:**
 - v1.3 requirements: 9 total
-- Mapped to phases: 9 (provisional — roadmapper finalizes)
+- Mapped to phases: 9 — finalized by roadmapper
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-01*
-*Last updated: 2026-07-01 after initial definition*
+*Last updated: 2026-07-01 — traceability finalized after roadmap creation (Phases 10-12)*

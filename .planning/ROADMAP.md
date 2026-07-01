@@ -5,6 +5,7 @@
 - ✅ **v1.0 Leaderboard & Competitions** — Phases 1-3, 10 plans (shipped 2026-06-29) → [archive](milestones/v1.0-ROADMAP.md)
 - ✅ **v1.1 Affiliate Reporting** — Phase 4, 4 plans (shipped 2026-06-30, ad-hoc) → [archive](milestones/v1.1-ROADMAP.md)
 - ✅ **v1.2 Ticket Fixes + PAP Queue Label** — Phases 4.1–9, 7 plans (shipped 2026-07-01, human-verify pending deploy) → [archive](milestones/v1.2-ROADMAP.md)
+- 🚧 **v1.3 CRM Partner Tracking (S2S Postbacks)** — Phases 10-12 (in progress)
 
 ## Phases
 
@@ -44,6 +45,79 @@ Full detail: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 
 </details>
 
+### 🚧 v1.3 CRM Partner Tracking (S2S Postbacks)
+
+**Milestone Goal:** A Trading Cult affiliate partner can attribute registrations and conversions to their own traffic — a partner `clickid` is captured at landing, persisted through signup and purchase, and fires S2S GET postbacks (with clickid + goal + payout) on registration and first sale (FTD only). Backend-heavy (pft-backend) + small pft-dashboard cookie-capture piece. Source ticket: cmqt52jdb001dny0kknkou9x0.
+
+**Hidden prerequisites made explicit:**
+- `TrackingEvents.signupCompleted()` and `.purchaseCompleted()` are defined but have ZERO callers today — Phase 11 must wire both as new call sites.
+- The existing `conversionWebhook` adapter is NOT reusable (wrong event map + POST/JSON/HMAC vs required GET/macro) — Phase 12 builds a new `partnerPostback` adapter.
+
+#### Phase 10: Capture & Persist
+
+**Goal:** The partner `clickid` is captured at the tracking-link entry point, survives in a first-party cookie to the registration form, and is persisted durably on both the User document and the Payment document — so every downstream event emitter can resolve it even from a gateway webhook callback where no browser request exists.
+
+**Depends on:** Nothing (first v1.3 phase; builds on existing User/Payment schema patterns)
+
+**Requirements:** CRM-01, CRM-02, CRM-03
+
+**Success Criteria** (what must be TRUE when Phase 10 completes):
+1. A GET request to `/track?clickid=ABC123` sets a `_partner_clickid` first-party cookie and redirects to the site; the clickid value is unchanged in the cookie.
+2. A user who registers after visiting a tracking link has `partnerClickId: "ABC123"` stored on their User document in the DB (verified via the post-registration user record).
+3. A payment created by that user has `partnerClickId: "ABC123"` stored on the Payment document (verified at checkout-creation time, before any gateway callback fires).
+4. A user who registers without a tracking link has no `partnerClickId` field on their User document (skip-when-absent behavior confirmed).
+
+**Plans:** TBD
+
+Plans:
+- [ ] 10-01: `GET /track` route + `_partner_clickid` cookie (CRM-01) + pft-dashboard cookie-read + forward in signup body (CRM-01 frontend)
+- [ ] 10-02: `partnerClickId` on User schema + persist at `verifyRegistrationOtp` (CRM-02)
+- [ ] 10-03: `partnerClickId` on Payment schema + persist at checkout creation (CRM-03)
+
+#### Phase 11: Wire Emits + Dedup
+
+**Goal:** The two tracking helpers that have zero callers today (`TrackingEvents.signupCompleted()` and `.purchaseCompleted()`) are wired at their real call sites — registration completion and all payment-completion paths including the currently-unwired PAP path — threading `partnerClickId` + `usdAmount` + `currency=USD` through each; a FTD (first-purchase) guard prevents repeat conversion fires; and a dual-dispatch audit ensures the existing legacy `ConversionWebhookEventsService` path cannot double-fire the same event.
+
+**Depends on:** Phase 10 (partnerClickId must be on User + Payment docs before emit sites can read it)
+
+**Requirements:** CRM-04, CRM-05, CRM-06, CRM-08
+
+**Success Criteria** (what must be TRUE when Phase 11 completes):
+1. After a user completes OTP registration, the `signup_completed` tracking event fires exactly once (verified via `TrackingEventLog`); a second OTP submission for the same user does not produce a second log entry.
+2. After a user's first completed payment (standard challenge or PAP funded-leg), the `purchase_completed` tracking event fires exactly once carrying `partnerClickId`, `usdAmount`, and `currency: "USD"`.
+3. A second completed payment by the same user does NOT produce a second `purchase_completed` tracking event (FTD guard confirmed).
+4. The PAP funded-leg payment-completion path (`pap_payment_completed`) emits the purchase event — confirmed by a `TrackingEventLog` entry for a PAP payment.
+5. A dual-dispatch audit of `ConversionWebhookEventsService` call sites confirms no event that now fires via the Tracking path can also double-fire via the legacy direct path.
+
+**Plans:** TBD
+
+Plans:
+- [ ] 11-01: Wire `TrackingEvents.signupCompleted()` at registration callsite + `partnerClickId` on `ITrackingEventPayload` (CRM-04)
+- [ ] 11-02: `trackingPurchaseEmit` utility + wire at all paid-completion paths incl. PAP (CRM-05, CRM-06) + FTD guard
+- [ ] 11-03: Dual-dispatch audit — confirm `ConversionWebhookEventsService` call sites do not overlap new Tracking path (CRM-08) + `TrackingEventLog` dedup verification
+
+#### Phase 12: partnerPostback Adapter + Config + Verify
+
+**Goal:** A new `partnerPostback` GET adapter fires to the partner's configured URL template with `{clickid}` / `goal` / `{payout}` macro substitution (URL-encoded), fire-and-forget with timeout and a delivery-log record; the per-brand `TrackingSettings.destinations.partnerPostback` config for Trading Cult stores the registration + conversion URL templates with an enable toggle; no other brand fires postbacks unless configured.
+
+**Depends on:** Phase 11 (emit events must fire before the adapter can receive them)
+
+**Requirements:** CRM-07, CRM-09
+
+**Success Criteria** (what must be TRUE when Phase 12 completes):
+1. A `destinations/partner-postback.ts` adapter exists, implements `IDestinationAdapter`, and is registered in `destinations/index.ts`; it returns `status: "skipped"` when `partnerClickId` is absent or the URL template is empty.
+2. When a `signup_completed` event fires for a user with a `partnerClickId`, the adapter issues a GET request to the configured registration URL template with `{clickid}` URL-encoded in the query string and `goal=registration`; a delivery-log record is written.
+3. When a `purchase_completed` event fires for a user with a `partnerClickId`, the adapter issues a GET request to the configured conversion URL template with `{clickid}` URL-encoded, `goal=conversion`, and `payout=<usdAmount>` + `currency=USD`; a delivery-log record is written.
+4. A `partnerClickId` value containing URL-special characters (e.g. `+`, `=`, `/`) is correctly `encodeURIComponent`-ed before substitution — the partner receives the exact original value.
+5. [POST-DEPLOY CHECKPOINT — deferred] Trading Cult live traffic: a test registration via a partner tracking link produces a delivery-log entry with `status: "sent"` and the partner's tracking system shows the registration event.
+
+**Plans:** TBD
+
+Plans:
+- [ ] 12-01: `TrackingSettings.destinations.partnerPostback` config shape + model + interface (CRM-09) + Trading Cult DB seed
+- [ ] 12-02: `destinations/partner-postback.ts` adapter — GET fetch, `expandMacros()`, `encodeURIComponent`, skip guards, delivery log, fire-and-forget wrapper (CRM-07)
+- [ ] 12-03: Register adapter + end-to-end integration verify (registration postback + conversion postback + URL-special-char clickid test)
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -58,3 +132,6 @@ Full detail: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 | 7. Used Margin Display | v1.2 | 2/2 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 8. Breach Email Template Vars | v1.2 | 1/1 | ✓ Complete (ops sync + verify pending deploy) | 2026-06-30 |
 | 9. PAP Funded Queue State Label | v1.2 | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-07-01 |
+| 10. Capture & Persist | v1.3 | 0/3 | Not started | - |
+| 11. Wire Emits + Dedup | v1.3 | 0/3 | Not started | - |
+| 12. partnerPostback Adapter + Config + Verify | v1.3 | 0/3 | Not started | - |
