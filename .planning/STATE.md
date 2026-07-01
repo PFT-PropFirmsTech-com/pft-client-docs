@@ -5,25 +5,25 @@
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state. Trading Cult affiliate partner attributes registrations and conversions via S2S postbacks.
-**Current focus:** v1.3 CRM Partner Tracking — Phase 10 code-complete; next Phase 11 (Wire Emits + Dedup).
+**Current focus:** v1.3 CRM Partner Tracking — Phase 11 in progress (11-01 complete; next 11-02 purchaseCompleted/papPaymentCompleted wiring).
 
 ## Current Position
 
-Phase: 10 of 12 (Capture & Persist) — code-complete
-Plan: 3/4 (10-01/02/03 shipped; 10-04 deferred post-deploy human-verify)
-Status: Phase 10 code-complete + pushed to origin/main-2026; verifier 7/7 static, status human_needed (live verify deferred). Ready to plan Phase 11.
-Last activity: 2026-07-01 — Phase 10 executed (backend 09ca7387/d2992553/4a079169, dashboard e111dab1)
+Phase: 11 of 12 (Wire Emits + Dedup) — in progress
+Plan: 1/3 (11-01 complete; 11-02 next)
+Status: 11-01 complete + pushed to origin/main-2026 (8e2f7509, 44deb3d4). Shared type surface landed; signupCompleted wired.
+Last activity: 2026-07-01 — 11-01 executed (8e2f7509 tracking types, 44deb3d4 auth wiring)
 
-**Phase 11 handoff:** `partnerClickId` now lives on the User doc + Payment `attribution` (server-authoritative from user doc). Partner tracking URL = `/api/tracking/track?clickid=…`. Phase 11 reads `user.partnerClickId` at the signup/purchase emit sites (wires the zero-caller `signupCompleted`/`purchaseCompleted`).
+**Phase 11 handoff:** `partnerClickId` now lives on the User doc + Payment `attribution` (server-authoritative from user doc). Partner tracking URL = `/api/tracking/track?clickid=…`. Phase 11 reads `user.partnerClickId` at the signup/purchase emit sites. 11-01 wired signupCompleted (zero→2 callers). 11-02 must wire purchaseCompleted/papPaymentCompleted.
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [███░░░░░░░] 33% (3/9 plans)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [████░░░░░░] 44% (4/9 plans)
 
 **Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT).
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 28 (v1.0: 10, v1.1: 4, v1.2: 7 [Phases 4.1/5/6/7/8/9])
+- Total plans completed: 29 (v1.0: 10, v1.1: 4, v1.2: 7 [Phases 4.1/5/6/7/8/9], v1.3: 4 [10-01/02/03, 11-01])
 - Average duration: ~5 min
 - Note: 2 of v1.2's plans closed-by-remote (Phase 6 fully, Phase 4.1 partial).
 
@@ -39,7 +39,12 @@ Progress: v1.0 [██████████] 100% (10/10) · v1.1 [███�
 
 ### Decisions
 
-Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (10-03 additions):
+Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (11-01 additions):
+- eventId passthrough requires NO dispatcher change — fire() spreads args into payload; adding eventId as a typed field on helper arg types is sufficient
+- OTP registeredUser carries partnerClickId without projection fix — findByIdAndUpdate({ new: true }).toObject() returns full doc
+- FTD as isFirstPurchase boolean flag (not event suppression) — purchase_completed/pap_payment_completed fire on every purchase; Phase 12 gates postback on isFirstPurchase=true
+
+v1.3 locked decisions (10-03 additions):
 - mergedAttribution pattern: spread client attribution (fbc/gclid/etc) then overlay user.partnerClickId — preserves ad-platform ids, server-authoritative for partner clickid
 - PAP funded-leg attribution: only partnerClickId in the object (no ad-platform ids on PAP path); undefined (not {}) when absent — skip-when-absent for Mongo field omission
 - Payment attribution.partnerClickId now stored at checkout creation time → survives req=null gateway/webhook callbacks in Phase 11/12
@@ -77,5 +82,5 @@ v1.3 base locked decisions:
 ## Session Continuity
 
 Last session: 2026-07-01
-Stopped at: 10-03 complete — CRM-03 attribution.partnerClickId on PaymentAttribution interface + Payment schema + both create sites (standard + PAP), pushed to main-2026 (4a079169). Phase 10 complete. Ready for Phase 11 (Tracking Events).
-Resume file: .planning/phases/11-tracking-events/ (next phase)
+Stopped at: 11-01 complete — CRM-04 type surface (ITrackingEventPayload + helper arg types) + signupCompleted wired at both registration sites, pushed to main-2026 (44deb3d4). Phase 11 in progress. Ready for 11-02 (purchaseCompleted/papPaymentCompleted wiring).
+Resume file: .planning/phases/11-wire-emits-dedup/11-02-PLAN.md
