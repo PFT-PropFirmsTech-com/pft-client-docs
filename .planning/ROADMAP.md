@@ -67,12 +67,13 @@ Full detail: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 3. A payment created by that user has `partnerClickId: "ABC123"` stored on the Payment document (verified at checkout-creation time, before any gateway callback fires).
 4. A user who registers without a tracking link has no `partnerClickId` field on their User document (skip-when-absent behavior confirmed).
 
-**Plans:** TBD
+**Plans:** 4 plans (3 autonomous code plans in Wave 1 + 1 deferred live-verify checkpoint in Wave 2)
 
 Plans:
-- [ ] 10-01: `GET /track` route + `_partner_clickid` cookie (CRM-01) + pft-dashboard cookie-read + forward in signup body (CRM-01 frontend)
-- [ ] 10-02: `partnerClickId` on User schema + persist at `verifyRegistrationOtp` (CRM-02)
-- [ ] 10-03: `partnerClickId` on Payment schema + persist at checkout creation (CRM-03)
+- [ ] 10-01: `GET /track` route + `_partner_clickid` cookie (backend) + pft-dashboard cookie-read + forward as `partnerClickId` in signup body (CRM-01) — [wave 1]
+- [ ] 10-02: `partnerClickId` on User interface + indexed schema field; persists via existing registration payload spread, survives OTP round-trip (CRM-02) — [wave 1]
+- [ ] 10-03: `partnerClickId` on Payment `attribution` interface+schema; persist from authoritative `user.partnerClickId` at standard checkout AND PAP funded-leg creation (CRM-03) — [wave 1]
+- [ ] 10-04: DEFERRED post-deploy live human-verify of the full capture→persist path (CRM-01/02/03) — [wave 2, gated on next main-2026 deploy]
 
 #### Phase 11: Wire Emits + Dedup
 
@@ -132,6 +133,6 @@ Plans:
 | 7. Used Margin Display | v1.2 | 2/2 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 8. Breach Email Template Vars | v1.2 | 1/1 | ✓ Complete (ops sync + verify pending deploy) | 2026-06-30 |
 | 9. PAP Funded Queue State Label | v1.2 | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-07-01 |
-| 10. Capture & Persist | v1.3 | 0/3 | Not started | - |
+| 10. Capture & Persist | v1.3 | 0/4 | Planned — ready to execute | - |
 | 11. Wire Emits + Dedup | v1.3 | 0/3 | Not started | - |
 | 12. partnerPostback Adapter + Config + Verify | v1.3 | 0/3 | Not started | - |
