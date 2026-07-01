@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state. Trading Cult affiliate partner attributes registrations and conversions via S2S postbacks.
-**Current focus:** v1.3 CRM Partner Tracking — Phase 12 in progress (12-01 done); 12-02 (adapter implementation) is next.
+**Current focus:** v1.3 CRM Partner Tracking — Phase 12 COMPLETE (12-01 config + 12-02 adapter both pushed to origin/main-2026). v1.3 is code-complete, pending post-deploy verification.
 
 ## Current Position
 
-Phase: 12 of 12 (Partner Postback Adapter) — IN PROGRESS
-Plan: 1/2 complete
-Status: Phase 12 plan 01 code-complete + pushed to origin/main-2026 (702b312f). Scoped tsc clean, grep counts 3/35 verified. Ready for 12-02 (adapter implementation).
-Last activity: 2026-07-01 — Phase 12 plan 01 executed (partnerPostback destination config: DESTINATIONS + IPartnerPostbackConfig + schema + validation + matrix column)
+Phase: 12 of 12 (Partner Postback Adapter) — COMPLETE
+Plan: 2/2 complete
+Status: Phase 12 code-complete. 12-01 (719e591b): partnerPostback config layer. 12-02 (719e591b): GET adapter registered. v1.3 CRM Partner Tracking fully shipped to origin/main-2026. Post-deploy verify pending.
+Last activity: 2026-07-01 — Phase 12 plan 02 executed (partnerPostback GET adapter: skip-guards + FTD gate + macro subst + encode-once + 5xx retry, registered)
 
-**Phase 12 handoff (12-01 → 12-02):** Config layer complete: `partnerPostback` is a DestinationName; `IPartnerPostbackConfig` (registrationUrl/conversionUrl/enabled); `PartnerPostbackConfigSchema` (disabled+empty defaults); matrix column (true: signup_completed/purchase_completed/pap_payment_completed; false: all free/$0 events); PUT validation accepts partnerPostback block. Plan 12-02 builds `destinations/partner-postback.ts` (GET + macro substitution), reads per-brand config from `TrackingSettings.destinations.partnerPostback`, gates CONVERSION send on `isFirstPurchase===true` (FTD once-per-user). Dispatcher already routes to partnerPostback via the column added in 12-01.
+**Phase 12 complete:** 12-01 config layer (702b312f) + 12-02 GET adapter (719e591b). `partnerPostbackAdapter` registered in `registerAllAdapters()`. Skip-guard chain: disabled → no clickid → event branch → FTD gate → empty template → macro subst → fetch GET. Post-deploy: set registrationUrl/conversionUrl via PUT /api/tracking/settings with partnerPostback block enabled=true.
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [███████░░░] 78% (7/9 plans)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████████] 100% (9/9 plans, code-complete)
 
 **Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT).
 
@@ -39,7 +39,13 @@ Progress: v1.0 [██████████] 100% (10/10) · v1.1 [███�
 
 ### Decisions
 
-Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (12-01 additions):
+Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (12-02 additions):
+- FTD gate lives in adapter (not event emitter): purchase_completed/pap_payment_completed fire on every purchase for Meta/GA4/Klaviyo; only partnerPostback skips non-FTD via isFirstPurchase===true in partner-postback.ts
+- Encode-once contract enforced at adapter (line 96 of partner-postback.ts): payload.partnerClickId stored raw through phases 10-11; encodeURIComponent applied exactly once at S2S send
+- usdAmount guard: payload.value carries usdAmount (Phase 11 fix 982ba9a1); String(payload.value ?? "") prevents JPY-as-USD bug reaching partner payout field
+- One retry on 5xx only (not network error): distinguishes transient partner-server faults from permanent connection issues; no new npm deps
+
+v1.3 locked decisions (12-01 additions):
 - No Trading Cult URLs hardcoded in config defaults — registrationUrl/conversionUrl default to empty string; set via PUT /api/tracking/settings post-deploy (brand-neutral config)
 - partnerPostback: false for all free_trial_signup/free_challenge_signup/pap_free_signup — $0 events must not fire S2S conversion postback (fraud-filter risk); registration signal from signup_completed: true
 - No toJSON masking for partnerPostback URLs — URL templates are not credentials (unlike webhookSecret/accessToken)
@@ -100,5 +106,5 @@ v1.3 base locked decisions:
 ## Session Continuity
 
 Last session: 2026-07-01
-Stopped at: 12-01 complete — partnerPostback config layer (702b312f). DESTINATIONS + IPartnerPostbackConfig + schema + validation + matrix column. All verify checks pass (grep 3/35, tsc 0 errors).
-Resume file: .planning/phases/12-partner-postback-adapter/12-02-PLAN.md (adapter implementation)
+Stopped at: 12-02 complete — partnerPostback GET adapter (719e591b). partner-postback.ts created + registered in index.ts. All verify checks pass (tsc 0 errors, grep counts confirmed). v1.3 code-complete.
+Resume file: None — v1.3 is complete. Next: v1.4 margin history enhancement (see Pending Todos) OR post-deploy human-verify for v1.3.
