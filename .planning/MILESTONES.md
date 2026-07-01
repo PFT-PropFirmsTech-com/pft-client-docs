@@ -1,5 +1,33 @@
 # Milestones
 
+## v1.2 — Ticket Fixes + PAP Queue Label (Shipped: 2026-07-01)
+
+**Delivered:** Six ticket-driven support/ops fixes swept together after v1.1 — affiliate CSV multi-tier commission sum, Daily P&L orphan-close undercount, funded-queue ready badge, used-margin display, breach-email reason vars — capped by the headline v1.2 feature: the PAP funded-queue state label that replaces the misleading "Program Not Assigned" warning on admin payment rows with the real compliance-gate state.
+
+**Phases completed:** 4.1, 5, 6, 7, 8, 9 (7 plans total)
+
+**Key accomplishments:**
+
+- **Phase 9 (PAP Funded Queue State Label, PAP-01):** `getPaymentHistoryAdmin` now batch-joins `FundedProgressionQueue` by `paymentId` and attaches `fundedDeferral` per row; admin PaymentsTable + PaymentDetailsContainer render "Awaiting KYC / Awaiting Contract / Awaiting KYC & Contract / In Funded Queue" and hide Retry/Mark Done on compliance-gated rows, preserving the amber "Program Not Assigned" + buttons for genuine failures. Sparse `{ paymentId: 1 }` index added. (pft-backend `5de7c9f8`, pft-dashboard `5dea14f2`)
+- **Phase 8 (Breach Email Vars):** seeded `rule_breached` body now interpolates `{ban_reason}` + 4 breach fields, variables registry grew 3→20, plus a per-brand `sync-rule-breached-template-vars` migration that union-merges without clobbering admin customisations. Closes XPIPS + Funding Optimal "why was I breached?" tickets. (pft-backend)
+- **Phase 7 (Used Margin Display):** rule-checker `accountrulestates` gained `currentMarginUsedPercent` + `peakMarginUsedPercent` (Math.max ratchet beside peak-drawdown); new `MarginUsageCard` renders on both client + admin account routes from live socket (current) + accountrulestates (peak). (pft-rule-checker `abede27`, pft-backend `1a7aa01e`, pft-dashboard `1acd03c6`)
+- **Phase 5 (Daily P&L Bug):** `mergedFromDeals` emits a synthetic closed row for orphan close deals (open outside the loaded buffer), fixing Daily P&L Calendar undercounting on Trading Cult account 13535. (pft-dashboard)
+- **Phase 4.1 (Affiliate CSV Bug):** admin Payment History CSV Commission Amount switched from tier-1-only to SUM across all MLM tiers + "Direct Commission Rate (%)" header (Bug 1, `60e9b37c`); sibling Bugs 2+3 closed by remote hotfixes that landed mid-flight. (pft-dashboard)
+- **Phase 6 (Funded Queue Ready Badge):** fully closed by remote — another dev shipped the sidebar red-dot for the same ticket between plan-write and plan-execute; both repos fast-forwarded, zero new commits (defer-to-remote convention). (pft-backend `c8340316`, pft-dashboard `73810f47`)
+
+**Stats:**
+- 3 repos touched (pft-backend, pft-dashboard, pft-rule-checker)
+- 6 phases, 7 plans; 2 plans closed-by-remote (Phase 6 fully, Phase 4.1 partial) via the `feedback_rebase_when_remote_already_fixed.md` convention
+- 2 days (2026-06-30 → 2026-07-01)
+
+**Git ranges (per repo, all on main-2026):** pft-dashboard `60e9b37c` → `5dea14f2`; pft-backend `c8340316` → `5de7c9f8`; pft-rule-checker `abede27` (Phase 7).
+
+**Caveat:** All code-complete + pushed to main-2026; live human-verify DEFERRED across every phase pending the next deploy (Phase 9 diagnostic: NSF payment `6a2c08b1ab4caef5631099a2` → expect "Awaiting KYC"). DEV ticket `cmqbzq6vc007ds50k008tr3du` flips WAITING_CLIENT post-verify.
+
+**What's next:** Deploy main-2026 → run the batched human-verify checklists (v1.0 through v1.2). Then v1.3 candidates — PAP-02 (Retry relabel) + PAP-03 (queue reason staleness); winner emails + competition history + auto prize disbursement (carried from v1.0); Funding Optimal free-trial program setup (ops, no code — pending todo).
+
+---
+
 ## v1.1 — Affiliate Reporting (Shipped: 2026-06-30)
 
 **Delivered:** Three affiliate reporting enhancements requested by Trading Cult (ticket cmqqchwh500bspi0kxw23o2rl) — affiliate commission columns in the admin Payment History CSV export, a clarification reply on Payout vs Withdrawal History, and a new per-purchase Purchase Report card with per-tier tabs and CSV export on the affiliate's own Overview page.

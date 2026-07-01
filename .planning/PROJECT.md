@@ -8,16 +8,11 @@ A white-label prop trading platform (pft-dashboard + pft-backend) that lets bran
 
 Funded traders see where they rank and compete in monthly prize-pool competitions (engagement + brand marketing). Affiliates see exactly which purchases earned them which commissions and can reconcile their earnings per tier; admins can reconcile customer purchases against affiliate payouts directly from the Payment History export. Support and back-office staff see the real reason a PAP funded account has not released (compliance gate, not a system failure) instead of a generic "Not Assigned" warning that invites a useless Retry loop.
 
-## Current Milestone: v1.2 PAP Funded Queue State Label
+## Current Milestone: None — v1.2 shipped 2026-07-01, awaiting next
 
-**Goal:** Replace the misleading "Program Not Assigned" warning on PAP funded-leg payment rows with the actual `fundedprogressionqueues` state, so support stops mistaking a KYC compliance gate for a technical failure.
+v1.2 "Ticket Fixes + PAP Queue Label" (Phases 4.1–9, 7 plans) is code-complete + pushed to main-2026; live human-verify deferred pending the next deploy. Full detail: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md).
 
-**Target features:**
-- Real queue-state label ("Awaiting KYC" / "Awaiting Contract" / "In Funded Queue") when a `fundedprogressionqueues` entry exists in `pending`/`processing` for the payment's user + funded programId (Item 1 from DEV cmqbzq6vc007ds50k008tr3du)
-
-**Explicitly deferred (not in v1.2):**
-- Retry button suppress/relabel (Item 2) — depends on final label taxonomy from Item 1
-- Queue `reason` field staleness fix (Item 3) — cosmetic backend-only, low priority
+Run `/gsd:new-milestone` to define the next one — candidates in **Next Milestone Goals** below.
 
 ## Requirements
 
@@ -36,14 +31,20 @@ Funded traders see where they rank and compete in monthly prize-pool competition
 - ✓ Bulk-by-orders backend endpoint (POST, admin-gated) — v1.1
 - ✓ User-scoped my-commissions backend endpoint (Auth user only, scoped to req.user._id, IDOR-resistant) — v1.1
 - ✓ Ticket cmqqchwh Payout-vs-Withdrawal clarification — v1.1 (no code)
+- ✓ Admin PAP funded-leg payment rows show the real `fundedprogressionqueues` state (Awaiting KYC / Awaiting Contract / In Funded Queue), Retry/Mark Done hidden on gated rows, amber "Program Not Assigned" preserved for genuine failures (PAP-01) — v1.2 Phase 9
+- ✓ Affiliate CSV Commission Amount sums across all MLM tiers + "Direct Commission Rate (%)" header — v1.2 Phase 4.1
+- ✓ Daily P&L Calendar counts orphan-close deals (synthetic closed row) — v1.2 Phase 5
+- ✓ Admin sidebar ready-badge on funded queue (KYC+contract approved) — v1.2 Phase 6 (closed by remote)
+- ✓ Used-margin display (current + all-time peak %) on client + admin account views — v1.2 Phase 7
+- ✓ Breach emails interpolate the rule-checker's exact reason (`{ban_reason}` + fields), variables registry 3→20 + per-brand sync migration — v1.2 Phase 8
 
-<sub>Code-complete + pushed to main-2026 for both v1.0 and v1.1; live human-verify pending the next deploy unlocks both.</sub>
+<sub>Code-complete + pushed to main-2026 for v1.0, v1.1, and v1.2; live human-verify pending the next deploy unlocks all three.</sub>
 
 ### Active
 
-- [ ] **PAP-01**: Admin payments view shows the actual `fundedprogressionqueues` state ("Awaiting KYC" / "Awaiting Contract" / "In Funded Queue") for PAP funded-leg rows, replacing the misleading generic "Program Not Assigned" warning when a queue entry exists in `pending`/`processing`.
+(None — v1.2 shipped. Define the next milestone via `/gsd:new-milestone`.)
 
-Candidate v1.3 / v2 scope: PAP Retry button suppress/relabel + queue reason staleness (deferred items 2 + 3 from DEV cmqbzq6vc007ds50k008tr3du); winner email notifications + competition history hall of fame + automated prize disbursement (carried from v1.0); broader admin-panel anchor refactor for new-tab/copy-link (DEV ticket cmqztddis); ticket-portal sprint + archive roadmap (Phases 2 & 3 from .planning/feedback notes); JA email localization completion for Trading Cult.
+Candidate v1.3 / v2 scope: **PAP-02** Retry button suppress/relabel + **PAP-03** queue reason staleness (deferred items 2 + 3 from DEV cmqbzq6vc007ds50k008tr3du, now unblocked — label taxonomy locked by Phase 9); winner email notifications + competition history hall of fame + automated prize disbursement (carried from v1.0); broader admin-panel anchor refactor for new-tab/copy-link (DEV ticket cmqztddis); ticket-portal sprint + archive roadmap (Phases 2 & 3 from .planning/feedback notes); JA email localization completion for Trading Cult; **Funding Optimal free-trial program setup** (ops, no code — pending todo, ticket cmnx4jvry0001mr0kezmxcnnv).
 
 ### Out of Scope
 
@@ -88,22 +89,29 @@ Candidate v1.3 / v2 scope: PAP Retry button suppress/relabel + queue reason stal
 | Commission fetch failure inside export degrades to empty affiliate columns | Never break the existing 19-column export over a downstream failure | ✓ Good |
 | `PurchaseReportTable` at module scope (not inside render) | Prevents accidental component remount on every parent render | ✓ Good |
 | Ticket replies that ship partial work keep status IN_PROGRESS (not WAITING_CLIENT) | Avoid forcing client to confirm partial work mid-flight | ✓ Good (v1.1 codified this for 04-02) |
+| Admin queue-state label gates on `fundedDeferral` presence + status, NOT `programAssigned` | Diagnostic payment shows `programAssigned=true` while queue is pending — the field is unreliable | ✓ Good (v1.2 Phase 9) |
+| Mirror the proven user-facing `getPaymentHistory` batch join into the admin path (vs new endpoint) | Reuses a shipped pattern; `PaymentData.fundedDeferral` type already declared — no type change | ✓ Good (v1.2 Phase 9) |
+| Margin denominator = `margin/equity*100` (NOT MT5 `marginLevel`); peak is all-time monotonic | Correct "% of account at risk" semantics; peak survives payout/daily/EOD resets | ✓ Good (v1.2 Phase 7) |
+| Breach-email body overwrite gated on strict equality with `OLD_RULE_BREACHED_BODY`; variables union-merged | Preserves admin customisations; never shrinks an existing registry | ✓ Good (v1.2 Phase 8) |
+| Defer-to-remote: fetch origin/main-2026 before editing; if bug already closed by a different shape, fast-forward | Prevents overwriting a teammate's deployed hotfix (Phase 6 fully, Phase 4.1 Bugs 2+3) | ✓ Good — locked convention (`feedback_rebase_when_remote_already_fixed.md`) |
 
 ## Current State
 
-**Shipped:** v1.0 Leaderboard & Competitions (2026-06-29) + v1.1 Affiliate Reporting (2026-06-30) — both code-complete, pushed to main-2026, live human-verify pending the next deploy (unlocks both).
+**Shipped:** v1.0 Leaderboard & Competitions (2026-06-29) + v1.1 Affiliate Reporting (2026-06-30) + v1.2 Ticket Fixes + PAP Queue Label (2026-07-01) — all code-complete, pushed to main-2026, live human-verify pending the next deploy (unlocks all three).
 
-**Codebase:** ~4,950 LOC added cumulatively across pft-backend, pft-dashboard, pfr-super-admin. Stack unchanged: Next.js + Node/TS + MongoDB; no new deps. Reusable bulk-by-orders pattern (POST body, single `$in` query) established in v1.1 for any future export use case.
+**Codebase:** ~4,950 LOC (v1.0/v1.1) plus v1.2's cross-repo ticket fixes across pft-backend, pft-dashboard, pft-rule-checker (7 plans, 2 closed-by-remote). Stack unchanged: Next.js + Node/TS + MongoDB; no new deps. Reusable patterns established: bulk-by-orders POST `$in` (v1.1); `paymentId`-keyed queue batch join mirrored into admin (v1.2).
 
-**Source tickets:** v1.0 = cmqybawiz007zny0k1wliphj7 (XPIPS, IN_PROGRESS, progress comment posted). v1.1 = cmqqchwh500bspi0kxw23o2rl (Trading Cult, IN_PROGRESS pending deploy; clarification reply posted, final WAITING_CLIENT flip after deploy).
+**Source tickets:** v1.0 = cmqybawiz007zny0k1wliphj7 (XPIPS). v1.1 = cmqqchwh500bspi0kxw23o2rl (Trading Cult). v1.2 = DEV cmqbzq6vc007ds50k008tr3du (PAP-01/Phase 9) + Trading Cult/XPIPS/FO ticket fixes (Phases 4.1–8). All flip WAITING_CLIENT after deploy + verify.
 
-**Open across both milestones (post-deploy):** live human-verify checklists for v1.0 Phases 2 & 3 (anon masking, opt-out timing, competition close, cache isolation) + v1.1 Phase 4 (Purchase Report card visual + Export CSV downloads + Network panel single-POST + showOverview-only scoping + 6 admin CSV cols populated). All deferred until main-2026 deploys.
+**Open (post-deploy human-verify, all gated on the next main-2026 deploy):** v1.0 Phases 2 & 3 (anon masking, opt-out, competition close, cache isolation); v1.1 Phase 4 (Purchase Report card + admin CSV cols + single-POST); v1.2 Phases 4.1–9 (CSV tier-sum; daily P&L TC acct 13535; funded-queue badge; margin card client+admin; breach-email body per brand XPIPS+FO; PAP queue label NSF payment 6a2c08b1ab4caef5631099a2 → "Awaiting KYC").
 
 ## Next Milestone Goals
 
 Define via `/gsd:new-milestone`. Candidates:
-- v1.2 lightweight: deploy + run all pending human-verify checklists (v1.0 + v1.1), broader admin-panel anchor-link refactor (DEV ticket cmqztddis)
-- v2 substantive: winner email notifications + competition history + automated prize disbursement (carried from v1.0)
+- **Ops (no code, actionable now):** Funding Optimal free-trial program setup (ticket cmnx4jvry0001mr0kezmxcnnv — pending todo).
+- **v1.3 PAP follow-ups (unblocked by Phase 9):** PAP-02 Retry button suppress/relabel + PAP-03 queue reason staleness.
+- **Post-deploy:** run all batched human-verify checklists (v1.0 → v1.2), then admin-panel anchor-link refactor (DEV cmqztddis).
+- **v2 substantive:** winner email notifications + competition history + automated prize disbursement (carried from v1.0).
 
 ---
-*Last updated: 2026-07-01 after starting v1.2 milestone*
+*Last updated: 2026-07-01 after v1.2 milestone completion*
