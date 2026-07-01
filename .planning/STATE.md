@@ -5,26 +5,26 @@
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state. Trading Cult affiliate partner attributes registrations and conversions via S2S postbacks.
-**Current focus:** v1.3 CRM Partner Tracking — Phase 12 COMPLETE (12-01 config + 12-02 adapter both pushed to origin/main-2026). v1.3 is code-complete, pending post-deploy verification.
+**Current focus:** v1.3 CRM Partner Tracking — Phase 12 COMPLETE (12-01 config, 12-02 adapter, 12-03 behavioral verification, all done — 12-01/12-02 pushed to origin/main-2026, 12-03 is verification-only with no code change). v1.3 is code-complete AND behaviorally verified at the code level; only the SC5 live-partner post-deploy test remains open.
 
 ## Current Position
 
 Phase: 12 of 12 (Partner Postback Adapter) — COMPLETE
-Plan: 2/2 complete
-Status: Phase 12 code-complete. 12-01 (719e591b): partnerPostback config layer. 12-02 (719e591b): GET adapter registered. v1.3 CRM Partner Tracking fully shipped to origin/main-2026. Post-deploy verify pending.
-Last activity: 2026-07-01 — Phase 12 plan 02 executed (partnerPostback GET adapter: skip-guards + FTD gate + macro subst + encode-once + 5xx retry, registered)
+Plan: 3/3 complete
+Status: Phase 12 code-complete and verified. 12-01 (702b312f): partnerPostback config layer. 12-02 (719e591b): GET adapter registered. 12-03 (b8721f2, docs-only): 10/10 behavioral harness PASS + 0-error whole-chain tsc — proves SC1-4 at code level; SC5 (live Trading Cult postback) recorded DEFERRED post-deploy. v1.3 CRM Partner Tracking fully shipped to origin/main-2026 and verified. Only post-deploy live-partner test remains.
+Last activity: 2026-07-01 — Phase 12 plan 03 executed (partnerPostback behavioral verification: stubbed-fetch harness 10/10 PASS + whole-chain scoped tsc 0 errors; 12-03-VERIFY.md + SUMMARY.md written)
 
-**Phase 12 complete:** 12-01 config layer (702b312f) + 12-02 GET adapter (719e591b). `partnerPostbackAdapter` registered in `registerAllAdapters()`. Skip-guard chain: disabled → no clickid → event branch → FTD gate → empty template → macro subst → fetch GET. Post-deploy: set registrationUrl/conversionUrl via PUT /api/tracking/settings with partnerPostback block enabled=true.
+**Phase 12 complete (all 3 plans):** 12-01 config layer (702b312f) + 12-02 GET adapter (719e591b) + 12-03 behavioral verification (b8721f2, parent-repo docs commit only — no pft-backend code change, harness found zero adapter bugs). `partnerPostbackAdapter` registered in `registerAllAdapters()`. Skip-guard chain: disabled → no clickid → event branch → FTD gate → empty template → macro subst → fetch GET. Verified via stubbed-fetch harness: skip-guards, registration GET, conversion GET (FTD-gated, payout=usdAmount, currency=USD), encode-once round-trip on URL-special-char clickid, single 5xx retry, never-throws-on-failure — all 10/10 PASS. Post-deploy: set registrationUrl/conversionUrl via PUT /api/tracking/settings with partnerPostback block enabled=true, then run the SC5 live checklist in `.planning/phases/12-partner-postback-adapter/12-03-VERIFY.md` section 4.
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████████] 100% (9/9 plans, code-complete)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████████] 100% (9/9 plans, code-complete + code-level verified)
 
-**Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT).
+**Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT) + v1.3 Phase 12 SC5 (live Trading Cult registration + conversion postback test, per `12-03-VERIFY.md` section 4 checklist — configure PUT /api/tracking/settings, registration test, conversion test w/ FTD gate, brand isolation test).
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 30 (v1.0: 10, v1.1: 4, v1.2: 7 [Phases 4.1/5/6/7/8/9], v1.3: 6 [10-01/02/03, 11-01/02/03])
-- Average duration: ~5 min
+- Total plans completed: 33 (v1.0: 10, v1.1: 4, v1.2: 7 [Phases 4.1/5/6/7/8/9], v1.3: 9 [10-01/02/03, 11-01/02/03, 12-01/02/03])
+- Average duration: ~6 min
 - Note: 2 of v1.2's plans closed-by-remote (Phase 6 fully, Phase 4.1 partial).
 
 **By Milestone:**
@@ -34,12 +34,18 @@ Progress: v1.0 [██████████] 100% (10/10) · v1.1 [███�
 | v1.0 | 1-3 | 10 | ~50 min | ~5 min |
 | v1.1 | 4 | 4 | ~28 min | ~7 min |
 | v1.2 | 4.1, 5-9 | 7 | ~40 min | ~5 min |
+| v1.3 | 10-12 | 9 | ~70 min | ~8 min |
 
 ## Accumulated Context
 
 ### Decisions
 
-Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (12-02 additions):
+Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (12-03 additions):
+- Full project-wide `tsc` (bare or `--skipLibCheck`) OOM-crashes on this machine at BOTH default heap and `--max-old-space-size=8192` — stronger confirmation of `reference_backend_tsc_oom.md`; scoped verification tasks should use a `files`-scoped tsconfig override (`extends` the real tsconfig for correct compiler options, `incremental:false` to avoid a poisoned `.tsbuildinfo`) rather than assume project-wide `--skipLibCheck` is safe
+- SC5 (live Trading Cult postback) is a DEFERRED post-deploy checkpoint, not a Phase 12 blocker — behavioral proof at the code level (stubbed-fetch harness + whole-chain tsc) is sufficient to mark v1.3 code-complete
+- Throwaway verification harnesses (test scripts, tsconfig overrides) are never committed — run once, capture output into the VERIFY.md doc, delete immediately
+
+v1.3 locked decisions (12-02 additions):
 - FTD gate lives in adapter (not event emitter): purchase_completed/pap_payment_completed fire on every purchase for Meta/GA4/Klaviyo; only partnerPostback skips non-FTD via isFirstPurchase===true in partner-postback.ts
 - Encode-once contract enforced at adapter (line 96 of partner-postback.ts): payload.partnerClickId stored raw through phases 10-11; encodeURIComponent applied exactly once at S2S send
 - usdAmount guard: payload.value carries usdAmount (Phase 11 fix 982ba9a1); String(payload.value ?? "") prevents JPY-as-USD bug reaching partner payout field
@@ -101,10 +107,10 @@ v1.3 base locked decisions:
 ### Blockers/Concerns
 
 - All v1.0–v1.2 human-verify checklists gated on next main-2026 deploy.
-- Phase 12 success criterion 5 (live Trading Cult postback verify) is a post-deploy checkpoint — not a Phase 12 blocker.
+- Phase 12 success criterion 5 (live Trading Cult postback verify) is a post-deploy checkpoint — not a Phase 12 blocker. Code-level proof (10/10 behavioral harness PASS + 0-error whole-chain tsc) is complete; only the live-partner-endpoint test remains, gated on next main-2026 deploy + Trading Cult providing real URL templates. Checklist recorded in `.planning/phases/12-partner-postback-adapter/12-03-VERIFY.md` section 4.
 
 ## Session Continuity
 
 Last session: 2026-07-01
-Stopped at: 12-02 complete — partnerPostback GET adapter (719e591b). partner-postback.ts created + registered in index.ts. All verify checks pass (tsc 0 errors, grep counts confirmed). v1.3 code-complete.
-Resume file: None — v1.3 is complete. Next: v1.4 margin history enhancement (see Pending Todos) OR post-deploy human-verify for v1.3.
+Stopped at: 12-03 complete — partnerPostback behavioral verification (b8721f2, parent-repo docs commit, no pft-backend code change). Stubbed-fetch harness 10/10 PASS (skip-guards, FTD gate, registration/conversion GET shapes, encode-once round-trip, 5xx retry, never-throws). Whole-chain scoped tsc: 0 errors across all 7 Tracking files. 12-03-VERIFY.md + 12-03-SUMMARY.md written. v1.3 CRM Partner Tracking is code-complete AND code-level verified — 9/9 plans across Phases 10-12 done.
+Resume file: None — v1.3 is complete (code + verification). Next: v1.4 margin history enhancement (see Pending Todos), OR post-deploy human-verify sweep for v1.0/v1.1/v1.2/v1.3 (v1.3's only remaining item is the SC5 live Trading Cult postback checklist in 12-03-VERIFY.md section 4), OR /gsd:complete-milestone for v1.3.
