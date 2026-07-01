@@ -5,25 +5,25 @@
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state. Trading Cult affiliate partner attributes registrations and conversions via S2S postbacks.
-**Current focus:** v1.3 CRM Partner Tracking — Phase 11 in progress (11-01 + 11-02 complete; next 11-03 dedup/config wiring).
+**Current focus:** v1.3 CRM Partner Tracking — Phase 11 complete (11-01, 11-02, 11-03 done); Phase 12 (partnerPostback adapter) is next.
 
 ## Current Position
 
-Phase: 11 of 12 (Wire Emits + Dedup) — in progress
-Plan: 2/3 (11-01 + 11-02 complete; 11-03 next)
-Status: 11-02 complete + pushed to origin/main-2026 (644ccd39, 982ba9a1). purchaseCompleted wired at all standard sites; papPaymentCompleted fixed with usdAmount.
-Last activity: 2026-07-01 — 11-02 executed (644ccd39 purchase tracking util+standard sites, 982ba9a1 PAP fixes+fanbasis)
+Phase: 11 of 12 (Wire Emits + Dedup) — COMPLETE
+Plan: 3/3 (all plans complete)
+Status: 11-03 complete (8540f5a). CRM-08 audit confirms disjoint event surfaces + stable eventId dedup. Phase 11 fully done; ready for Phase 12.
+Last activity: 2026-07-01 — 11-03 executed (8540f5a CRM-08 dual-path audit + dedup verification doc)
 
 **Phase 11 handoff:** `partnerClickId` now lives on the User doc + Payment `attribution` (server-authoritative from user doc). Partner tracking URL = `/api/tracking/track?clickid=…`. Phase 11 reads `user.partnerClickId` at signup sites and `payment.attribution.partnerClickId` at purchase sites. 11-01 wired signupCompleted (zero→2 callers). 11-02 wired purchaseCompleted at all standard sites + fixed papPaymentCompleted (usdAmount, currency:USD, stable eventId, partnerClickId). 11-03 (dedup/config) is next.
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [█████░░░░░] 56% (5/9 plans)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████░░░░] 67% (6/9 plans)
 
 **Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT).
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 29 (v1.0: 10, v1.1: 4, v1.2: 7 [Phases 4.1/5/6/7/8/9], v1.3: 4 [10-01/02/03, 11-01])
+- Total plans completed: 30 (v1.0: 10, v1.1: 4, v1.2: 7 [Phases 4.1/5/6/7/8/9], v1.3: 6 [10-01/02/03, 11-01/02/03])
 - Average duration: ~5 min
 - Note: 2 of v1.2's plans closed-by-remote (Phase 6 fully, Phase 4.1 partial).
 
@@ -39,7 +39,12 @@ Progress: v1.0 [██████████] 100% (10/10) · v1.1 [███�
 
 ### Decisions
 
-Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (11-02 additions):
+Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (11-03 additions):
+- ConversionWebhookEventsService event surface {ChallengePassed,ChallengeFailed,PayoutCompleted,KYCCompleted,AccountFunded,dispatchFromWorker} is disjoint from Tracking path events {signup_completed,purchase_completed,pap_payment_completed} — confirmed by live grep at post-11-02 HEAD; no guard or refactor needed (CRM-08 closed)
+- deterministicEventId is minute-bucketed (Math.floor(ts/60000)) — safe only for browser<>server same-minute dedup; gateway webhook retries a minute+ later need explicit stable eventIds
+- Phase 11 stable eventId scheme (signup:<userId>, purchase:<paymentId>, pap:<paymentId>) satisfies CRM-08 cross-minute idempotency requirement
+
+v1.3 locked decisions (11-02 additions):
 - fanbasis DOES provision PAP funded-legs (deferPapFundedLegIfNeeded gate + assignProgramToUser with payAfterPass fields) → papPaymentCompleted added in ensureProgramAssigned when payAfterPass && currentProgramId
 - FTD count === 1 (not === 0) at all standard sites: status="completed" is persisted before completion side-effects at all call sites
 - Stripe emit placed once in processPaymentCompletion (shared by both checkout.session.completed + payment_intent.succeeded) — single call site, stable eventId deduplicates if both events fire
@@ -88,5 +93,5 @@ v1.3 base locked decisions:
 ## Session Continuity
 
 Last session: 2026-07-01
-Stopped at: 11-02 complete — CRM-05+06 purchaseCompleted wired at all standard sites (emitTrackingPurchaseCompleted util) + papPaymentCompleted fixed (usdAmount/currency:USD/eventId/partnerClickId) at all PAP sites + fanbasis PAP wired, pushed to main-2026 (644ccd39, 982ba9a1). Phase 11 in progress. Ready for 11-03.
-Resume file: .planning/phases/11-wire-emits-dedup/11-03-PLAN.md
+Stopped at: 11-03 complete — CRM-08 dual-path audit written (8540f5a). Confirmed disjoint event surfaces, stable eventId dedup, minute-bucket caveat. Phase 11 fully complete. Ready for Phase 12 (partnerPostback adapter).
+Resume file: .planning/phases/12-partner-postback/ (Phase 12 plan)
