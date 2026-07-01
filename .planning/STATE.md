@@ -46,7 +46,9 @@ Full decision log in PROJECT.md Key Decisions table. Recent decisions affecting 
 
 ### Pending Todos
 
-None (v1.2 is the active task — run `/gsd:plan-phase 9`).
+1. Setup free trial Program docs for Funding Optimal (ops, no code — see `.planning/todos/pending/2026-07-01-setup-free-trial-program-docs-for-funding-optimal.md`). Deferred until after v1.2 Phase 9.
+
+v1.2 Phase 9 is the active task — run `/gsd:plan-phase 9`.
 
 ### Blockers/Concerns
 
