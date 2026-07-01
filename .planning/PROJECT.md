@@ -8,11 +8,20 @@ A white-label prop trading platform (pft-dashboard + pft-backend) that lets bran
 
 Funded traders see where they rank and compete in monthly prize-pool competitions (engagement + brand marketing). Affiliates see exactly which purchases earned them which commissions and can reconcile their earnings per tier; admins can reconcile customer purchases against affiliate payouts directly from the Payment History export. Support and back-office staff see the real reason a PAP funded account has not released (compliance gate, not a system failure) instead of a generic "Not Assigned" warning that invites a useless Retry loop.
 
-## Current Milestone: None — v1.2 shipped 2026-07-01, awaiting next
+## Current Milestone: v1.3 CRM Partner Tracking (S2S Postbacks)
 
-v1.2 "Ticket Fixes + PAP Queue Label" (Phases 4.1–9, 7 plans) is code-complete + pushed to main-2026; live human-verify deferred pending the next deploy. Full detail: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md).
+**Goal:** Let a Trading Cult affiliate partner track registrations and conversions via a tracking link that carries their own `clickid`, by capturing + persisting that clickid unchanged through the signup→purchase funnel and firing S2S postbacks (with clickid + goal + payout) back to the partner on registration and sale.
 
-Run `/gsd:new-milestone` to define the next one — candidates in **Next Milestone Goals** below.
+**Target features:**
+- Tracking-link entry captures an arbitrary partner `clickid` (e.g. `/track?clickid={clickid}` or `?clickid=` on a landing URL) and persists it click → registration → sale, unchanged
+- S2S GET postback with `{clickid}` / `goal` / `{payout}` macro substitution fired on registration (`signup_completed`) and conversion/sale (`purchase_completed`), extending the existing `Admin/ConversionWebhook` + `Tracking/destinations` dispatch
+- Minimal/one-off config for THIS partner (Trading Cult) — not a generic multi-partner admin surface (per user decision 2026-07-01)
+
+**Explicitly deferred (not in v1.3):**
+- Pull API (partner alternative B) — postbacks first; API later if the partner needs it
+- Generic per-brand/per-partner postback admin UI — build reusable only when a 2nd partner appears
+
+Full scope in `.planning/REQUIREMENTS.md` (after roadmap). Source ticket: cmqt52jdb001dny0kknkou9x0 (Trading Cult).
 
 ## Requirements
 
@@ -42,7 +51,7 @@ Run `/gsd:new-milestone` to define the next one — candidates in **Next Milesto
 
 ### Active
 
-(None — v1.2 shipped. Define the next milestone via `/gsd:new-milestone`.)
+- [ ] **v1.3 CRM Partner Tracking** — capture + persist a partner `clickid` through signup→purchase; fire S2S postbacks (clickid/goal/payout) on registration + sale for the Trading Cult partner (ticket cmqt52jdb001dny0kknkou9x0). Requirements defined after research.
 
 Candidate v1.3 / v2 scope: **PAP-02** Retry button suppress/relabel + **PAP-03** queue reason staleness (deferred items 2 + 3 from DEV cmqbzq6vc007ds50k008tr3du, now unblocked — label taxonomy locked by Phase 9); winner email notifications + competition history hall of fame + automated prize disbursement (carried from v1.0); broader admin-panel anchor refactor for new-tab/copy-link (DEV ticket cmqztddis); ticket-portal sprint + archive roadmap (Phases 2 & 3 from .planning/feedback notes); JA email localization completion for Trading Cult; **Funding Optimal free-trial program setup** (ops, no code — pending todo, ticket cmnx4jvry0001mr0kezmxcnnv).
 
@@ -114,4 +123,4 @@ Define via `/gsd:new-milestone`. Candidates:
 - **v2 substantive:** winner email notifications + competition history + automated prize disbursement (carried from v1.0).
 
 ---
-*Last updated: 2026-07-01 after v1.2 milestone completion*
+*Last updated: 2026-07-01 after starting v1.3 CRM Partner Tracking milestone*

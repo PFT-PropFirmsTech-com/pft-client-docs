@@ -5,14 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state instead of a misleading "Program Not Assigned" warning.
-**Current focus:** Planning next milestone (v1.2 complete). Actionable now: Funding Optimal free-trial setup (ops, no code).
+**Current focus:** v1.3 CRM Partner Tracking (S2S postbacks) — defining requirements.
 
 ## Current Position
 
-Phase: — (v1.2 milestone complete; no active phase)
-Plan: Not started
-Status: v1.2 milestone complete — tagged, archived. Ready to plan next milestone via `/gsd:new-milestone`.
-Last activity: 2026-07-01 — v1.2 "Ticket Fixes + PAP Queue Label" (Phases 4.1–9) complete
+Phase: Not started (v1.3 — defining requirements)
+Plan: —
+Status: v1.3 milestone started — research in progress, then requirements → roadmap. Phase numbering continues from 9 (v1.3 starts at Phase 10).
+Last activity: 2026-07-01 — v1.3 CRM Partner Tracking milestone started (ticket cmqt52jdb001dny0kknkou9x0)
+
+Milestone scope decisions (2026-07-01): S2S postbacks first (pull API deferred); minimal one-off for the Trading Cult partner (not a generic multi-partner surface); research-first.
 
 Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) — Phases 4.1, 5, 6, 7, 8, 9
 
