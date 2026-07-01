@@ -5,14 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state. Trading Cult affiliate partner attributes registrations and conversions via S2S postbacks.
-**Current focus:** v1.3 CRM Partner Tracking — Phase 10: Capture & Persist (complete)
+**Current focus:** v1.3 CRM Partner Tracking — Phase 10 code-complete; next Phase 11 (Wire Emits + Dedup).
 
 ## Current Position
 
-Phase: 10 of 12 (Capture & Persist)
-Plan: 3 of 3 in Phase 10
-Status: Phase complete
-Last activity: 2026-07-01 — Completed 10-03-PLAN.md (CRM-03 Payment attribution.partnerClickId persist at checkout + PAP)
+Phase: 10 of 12 (Capture & Persist) — code-complete
+Plan: 3/4 (10-01/02/03 shipped; 10-04 deferred post-deploy human-verify)
+Status: Phase 10 code-complete + pushed to origin/main-2026; verifier 7/7 static, status human_needed (live verify deferred). Ready to plan Phase 11.
+Last activity: 2026-07-01 — Phase 10 executed (backend 09ca7387/d2992553/4a079169, dashboard e111dab1)
+
+**Phase 11 handoff:** `partnerClickId` now lives on the User doc + Payment `attribution` (server-authoritative from user doc). Partner tracking URL = `/api/tracking/track?clickid=…`. Phase 11 reads `user.partnerClickId` at the signup/purchase emit sites (wires the zero-caller `signupCompleted`/`purchaseCompleted`).
 
 Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [███░░░░░░░] 33% (3/9 plans)
 
