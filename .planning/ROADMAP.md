@@ -4,6 +4,7 @@
 
 - ✅ **v1.0 Leaderboard & Competitions** — Phases 1-3, 10 plans (shipped 2026-06-29) → [archive](milestones/v1.0-ROADMAP.md)
 - ✅ **v1.1 Affiliate Reporting** — Phase 4, 4 plans (shipped 2026-06-30, ad-hoc) → [archive](milestones/v1.1-ROADMAP.md)
+- 🚧 **v1.2 PAP Funded Queue State Label** — Phase 9, 1 plan (in progress)
 
 ## Phases
 
@@ -114,9 +115,33 @@ Plans:
 - Fix shape: (a) extend the seeded `messagetemplates.variables` array on the 4 breach-related templates (`Rule Breached Template`, `Funded Account Breach`, `Leverage Exceeded Breach Template`, `inactivity breached email`) so admins see the available placeholders in the editor; (b) update the default HTML body for those templates to interpolate `{{ban_reason}}` + `{{breach_date}}` near the top; (c) one-off mongosh script per brand DB to sync existing templates without overwriting brand customisations.
 - Out of scope: changing what the rule-checker computes (the reason string is already canonical); changing the email layout/branding; Funding Optimal's deeper UX asks — option (a) make balance == equity at breach moment, option (b) force balance display below the limit. Those are systemic redesigns; ship Phase 8 first, measure whether the email reason reduces complaint volume, then decide if a Phase 9 UX overhaul is justified.
 
-### Next milestone
+### v1.2 PAP Funded Queue State Label (In Progress)
 
-(None yet — run `/gsd:new-milestone` to define v1.2 / v2.0.)
+**Milestone Goal:** Replace the misleading "Program Not Assigned" warning on PAP funded-leg payment rows with the actual `fundedprogressionqueues` state, so support stops mistaking a KYC compliance gate for a technical failure.
+
+### Phase 9: PAP Funded Queue State Label
+
+**Goal:** Admin payments view surfaces the real queue state — "Awaiting KYC", "Awaiting Contract", or "In Funded Queue" — for PAP funded-leg rows that have a matching `fundedprogressionqueues` entry in `pending`/`processing`, replacing the generic "Program Not Assigned" label. When no queue entry exists (a genuine system failure), the existing "Program Not Assigned" label + Retry/Mark Done buttons render unchanged.
+
+**Depends on:** None (independent read-only join; no existing phase modified)
+**Requirements:** PAP-01
+**Success Criteria** (what must be TRUE when this phase completes):
+  1. A PAP funded-leg payment row whose user has a `pending`/`processing` queue entry shows one of: "Awaiting KYC", "Awaiting Contract", or "In Funded Queue" — not "Program Not Assigned".
+  2. The queue-state label reflects the real gate: "Awaiting KYC" when `kycApproved=false`, "Awaiting Contract" when KYC passed but `contractApproved=false`, "In Funded Queue" when both are approved but the queue hasn't released yet.
+  3. The Retry button and Mark Done button are hidden (or inert) on rows that show a queue-state label, so support cannot trigger a useless retry loop on a compliance-gated row.
+  4. A PAP funded-leg row with genuinely no queue entry (pre-PAP failure path) still renders "Program Not Assigned" + Retry/Mark Done buttons exactly as before.
+  5. Non-PAP payment rows are unaffected — no queue lookup is performed and their layout is unchanged.
+
+**Plans:** 1 plan
+
+Plans:
+- [ ] 09-01-PLAN.md — Backend: attach queue state to PAP funded-leg payment response (join `fundedprogressionqueues` via `FundedProgressionQueueService`, keyed userId + nextStageProgramId, status in [pending, processing]). Dashboard: read queue state in `PaymentsContainer`/`PaymentDetailsContainer`, conditional render of queue-state label + suppress Retry/Mark Done on queue-gated rows.
+
+**Technical context:**
+- Backend extension point: `pft-backend/src/app/modules/Payment/` — either enrich the existing payment response (recommended: append `queueState: { status, kycApproved, contractApproved } | null` per PAP funded-leg row) or ship a separate `GET /funded-queue/state?userId=&programId=` lookup endpoint. `FundedProgressionQueueService` already exists; key: `(userId, nextStageProgramId)`.
+- Dashboard grep anchor: search `"Program Not Assigned"` in `pft-dashboard/src/` to locate the rendering branch. Conditional render pattern precedent: `PaymentsContainer` / `PaymentDetailsContainer` in `pft-dashboard/src/app/(dashboard)/_components/modules/admin/`.
+- Label derivation: `kycApproved=false` → "Awaiting KYC"; `kycApproved=true && contractApproved=false` → "Awaiting Contract"; both true → "In Funded Queue".
+- Reference memory: `reference_pap_funded_queue_gate.md` — captures workaround (approve KYC → auto-release) and prior AI notes.
 
 ## Progress
 
@@ -131,3 +156,4 @@ Plans:
 | 6. Funded Queue Ready Badge | ad-hoc | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 7. Used Margin Display | ad-hoc | 2/2 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 8. Breach Email Template Vars | ad-hoc | 1/1 | ✓ Complete (ops sync + verify pending deploy) | 2026-06-30 |
+| 9. PAP Funded Queue State Label | v1.2 | 0/1 | Not started | - |
