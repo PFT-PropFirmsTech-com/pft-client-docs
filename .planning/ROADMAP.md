@@ -5,7 +5,7 @@
 - ✅ **v1.0 Leaderboard & Competitions** — Phases 1-3, 10 plans (shipped 2026-06-29) → [archive](milestones/v1.0-ROADMAP.md)
 - ✅ **v1.1 Affiliate Reporting** — Phase 4, 4 plans (shipped 2026-06-30, ad-hoc) → [archive](milestones/v1.1-ROADMAP.md)
 - ✅ **v1.2 Ticket Fixes + PAP Queue Label** — Phases 4.1–9, 7 plans (shipped 2026-07-01, human-verify pending deploy) → [archive](milestones/v1.2-ROADMAP.md)
-- 🚧 **v1.3 CRM Partner Tracking (S2S Postbacks)** — Phases 10-12 (in progress)
+- ✅ **v1.3 CRM Partner Tracking (S2S Postbacks)** — Phases 10-12, 9 plans (shipped 2026-07-01, live-verify pending deploy + partner config) → [archive](milestones/v1.3-ROADMAP.md)
 
 ## Phases
 
@@ -45,84 +45,18 @@ Full detail: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 
 </details>
 
-### 🚧 v1.3 CRM Partner Tracking (S2S Postbacks)
+<details>
+<summary>✅ v1.3 CRM Partner Tracking (S2S Postbacks) (Phases 10-12) — SHIPPED 2026-07-01</summary>
 
-**Milestone Goal:** A Trading Cult affiliate partner can attribute registrations and conversions to their own traffic — a partner `clickid` is captured at landing, persisted through signup and purchase, and fires S2S GET postbacks (with clickid + goal + payout) on registration and first sale (FTD only). Backend-heavy (pft-backend) + small pft-dashboard cookie-capture piece. Source ticket: cmqt52jdb001dny0kknkou9x0.
+A Trading Cult affiliate partner can attribute registrations and conversions to their own traffic via a partner `clickid` captured at landing, persisted through signup + purchase (survives `req=null` gateway callbacks), firing S2S GET postbacks on registration and first sale (FTD). All code-complete + pushed to main-2026, code-level verified (behavioral harness + whole-chain tsc); live human-verify deferred pending deploy + Trading Cult's real postback URLs.
 
-**Hidden prerequisites made explicit:**
-- `TrackingEvents.signupCompleted()` and `.purchaseCompleted()` are defined but have ZERO callers today — Phase 11 must wire both as new call sites.
-- The existing `conversionWebhook` adapter is NOT reusable (wrong event map + POST/JSON/HMAC vs required GET/macro) — Phase 12 builds a new `partnerPostback` adapter.
+- [x] Phase 10: Capture & Persist (3/4 — 10-04 deferred) — `/api/tracking/track?clickid=…` → cookie → persisted on User (`d2992553`) + Payment attribution incl. PAP (`4a079169`).
+- [x] Phase 11: Wire Emits + Dedup (3/3) — signupCompleted/purchaseCompleted wired at every real completion path incl. PAP + fanbasis (`8e2f7509`, `644ccd39`, `982ba9a1`); JPY-as-USD bug fixed; stable-eventId dedup audited (`8540f5a`).
+- [x] Phase 12: partnerPostback Adapter + Config + Verify (3/3) — new GET adapter w/ macro substitution + FTD gate (`719e591b`), per-brand config (`702b312f`), 10/10 behavioral harness pass.
 
-#### Phase 10: Capture & Persist
+Full detail: [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md)
 
-**Goal:** The partner `clickid` is captured at the tracking-link entry point, survives in a first-party cookie to the registration form, and is persisted durably on both the User document and the Payment document — so every downstream event emitter can resolve it even from a gateway webhook callback where no browser request exists.
-
-**Depends on:** Nothing (first v1.3 phase; builds on existing User/Payment schema patterns)
-
-**Requirements:** CRM-01, CRM-02, CRM-03
-
-**Success Criteria** (what must be TRUE when Phase 10 completes):
-1. A GET request to `/track?clickid=ABC123` sets a `_partner_clickid` first-party cookie and redirects to the site; the clickid value is unchanged in the cookie.
-2. A user who registers after visiting a tracking link has `partnerClickId: "ABC123"` stored on their User document in the DB (verified via the post-registration user record).
-3. A payment created by that user has `partnerClickId: "ABC123"` stored on the Payment document (verified at checkout-creation time, before any gateway callback fires).
-4. A user who registers without a tracking link has no `partnerClickId` field on their User document (skip-when-absent behavior confirmed).
-
-**Plans:** 4 plans (3 autonomous code plans in Wave 1 + 1 deferred live-verify checkpoint in Wave 2)
-
-Plans:
-- [x] 10-01: `GET /track` route + `_partner_clickid` cookie (backend `09ca7387`) + pft-dashboard cookie-read + forward as `partnerClickId` in signup body (`e111dab1`) (CRM-01) — [wave 1] ✓
-- [x] 10-02: `partnerClickId` on User interface + indexed schema field; persists via existing registration payload spread, survives OTP round-trip — no auth.service.ts edit (backend `d2992553`) (CRM-02) — [wave 1] ✓
-- [x] 10-03: `partnerClickId` on Payment `attribution` interface+schema; persist from authoritative `user.partnerClickId` at standard checkout AND PAP funded-leg creation (backend `4a079169`) (CRM-03) — [wave 1] ✓
-- [ ] 10-04: DEFERRED post-deploy live human-verify of the full capture→persist path (CRM-01/02/03) — [wave 2, gated on next main-2026 deploy]
-
-Note: partner-facing tracking URL is `/api/tracking/track?clickid=…` (mounted under existing tracking router). A prettier `/track` requires a brand-landing infra rewrite — config/verify detail, not code.
-
-#### Phase 11: Wire Emits + Dedup
-
-**Goal:** The two tracking helpers that have zero callers today (`TrackingEvents.signupCompleted()` and `.purchaseCompleted()`) are wired at their real call sites — registration completion and all payment-completion paths including the PAP path — threading `partnerClickId` + `usdAmount` + `currency=USD` through each; an FTD (first-purchase) FLAG is produced on every purchase event; and a dual-dispatch audit ensures the legacy `ConversionWebhookEventsService` path cannot double-fire the same event.
-
-**Depends on:** Phase 10 (partnerClickId must be on User + Payment docs before emit sites can read it)
-
-**Requirements:** CRM-04, CRM-05, CRM-06, CRM-08
-
-**Success Criteria** (what must be TRUE when Phase 11 completes):
-1. After a user completes registration (one-step OR two-step OTP), the `signup_completed` tracking event fires carrying the user's `partnerClickId` when present; a repeat submission for the same user dedups to one event (stable `signup:<userId>` eventId).
-2. After a user's completed payment (standard challenge or PAP funded-leg), a purchase event fires carrying `partnerClickId`, `usdAmount`, and `currency: "USD"` — resolved from `payment.attribution.partnerClickId` (works in a `req=null` gateway callback).
-3. Each purchase event carries an `isFirstPurchase` boolean FTD flag (computed via `Payment.countDocuments({userId, status:"completed"})`). `purchase_completed` / `pap_payment_completed` are NOT suppressed on repeat purchases (Meta/GA4/Klaviyo consume every purchase) — the once-per-user conversion guarantee is enforced in Phase 12 by gating the partner conversion send on `isFirstPurchase === true`.
-4. A PAP funded-leg completion fires exactly ONE partner-conversion-eligible event (`pap_payment_completed`, using `usdAmount` not the billed `payAfterPassRemainingPrice`) and does NOT also fire `purchase_completed` for the same payment (`emitTrackingPurchaseCompleted` early-returns for PAP legs). A free $0 purchase produces no conversion-eligible event.
-5. Retries are idempotent: purchase/PAP emits pass a stable `purchase:<paymentId>` / `pap:<paymentId>` eventId so gateway-webhook re-delivery collapses to one event (the default `deterministicEventId` only dedups within a minute).
-6. A dual-dispatch audit of `ConversionWebhookEventsService` confirms it fires only KYC/payout/challenge lifecycle events — disjoint from the new Tracking signup/purchase events, so no double-fire.
-
-**Plans:** 3 plans (11-01 in Wave 1 = shared type extension + signup wiring; 11-02 + 11-03 in Wave 2, parallel — disjoint files)
-
-Plans:
-- [x] 11-01: Extend `ITrackingEventPayload` + helper signatures with `partnerClickId`/`isFirstPurchase`/stable `eventId`; wire `TrackingEvents.signupCompleted()` at both registration-completion sites (backend `8e2f7509`+`44deb3d4`) (CRM-04) — [wave 1] ✓
-- [x] 11-02: `emitTrackingPurchaseCompleted` utility (attribution.partnerClickId + usdAmount + FTD flag + PAP-skip + stable eventId) wired at 4 standard completion sites; `papPaymentCompleted` at 3 sites switched to usdAmount (JPY bug) + partnerClickId + stable eventId; fanbasis DOES provision PAP → wired there too (backend `644ccd39`+`982ba9a1`) (CRM-05, CRM-06) — [wave 2] ✓
-- [x] 11-03: CRM-08 dual-dispatch audit — legacy `ConversionWebhookEventsService` (6 methods, KYC/payout/challenge only) confirmed disjoint from signup/purchase/pap; stable eventIds make retries idempotent → `11-DEDUP-AUDIT.md` (`8540f5a`) (CRM-08) — [wave 2] ✓
-
-#### Phase 12: partnerPostback Adapter + Config + Verify
-
-**Goal:** A new `partnerPostback` GET adapter fires to the partner's configured URL template with `{clickid}` / `goal` / `{payout}` macro substitution (URL-encoded), fire-and-forget with timeout and a delivery-log record; the per-brand `TrackingSettings.destinations.partnerPostback` config for Trading Cult stores the registration + conversion URL templates with an enable toggle; no other brand fires postbacks unless configured.
-
-**Depends on:** Phase 11 (emit events must fire before the adapter can receive them)
-
-**Requirements:** CRM-07, CRM-09
-
-**Success Criteria** (what must be TRUE when Phase 12 completes):
-1. A `destinations/partner-postback.ts` adapter exists, implements `IDestinationAdapter`, and is registered in `destinations/index.ts`; it returns `status: "skipped"` when `partnerClickId` is absent or the URL template is empty.
-2. When a `signup_completed` event fires for a user with a `partnerClickId`, the adapter issues a GET request to the configured registration URL template with `{clickid}` URL-encoded in the query string and `goal=registration`; a delivery-log record is written.
-3. When a `purchase_completed` / `pap_payment_completed` event fires for a user with a `partnerClickId` AND `isFirstPurchase === true`, the adapter issues a GET request to the configured conversion URL template with `{clickid}` URL-encoded, `goal=conversion`, and `payout=<usdAmount>` + `currency=USD`; a delivery-log record is written. Repeat purchases (`isFirstPurchase:false`) do NOT send the conversion postback.
-4. A `partnerClickId` value containing URL-special characters (e.g. `+`, `=`, `/`) is correctly `encodeURIComponent`-ed before substitution — the partner receives the exact original value.
-5. [POST-DEPLOY CHECKPOINT — deferred] Trading Cult live traffic: a test registration via a partner tracking link produces a delivery-log entry with `status: "sent"` and the partner's tracking system shows the registration event.
-
-**Plans:** 3 plans (12-01 config in Wave 1; 12-02 adapter+register in Wave 2 depends on 12-01 types; 12-03 verify + deferred live checkpoint in Wave 3)
-
-Plans:
-- [x] 12-01-PLAN.md — partnerPostback destination config: DESTINATIONS tuple + `IPartnerPostbackConfig` + `ITrackingSettings.destinations.partnerPostback` + mongoose sub-schema (disabled+empty defaults) + PUT-settings validation block + `partnerPostback` matrix column (true only for signup_completed/purchase_completed/pap_payment_completed) (backend `702b312f`) (CRM-09) — [wave 1] ✓
-- [x] 12-02-PLAN.md — `destinations/partner-postback.ts` GET adapter (skip-guards + FTD `isFirstPurchase` gate + macro substitution w/ encode-once + AbortSignal.timeout(15000) + one 5xx retry + never-throw) and `registerAdapter(partnerPostbackAdapter)` (backend `719e591b`) (CRM-07) — [wave 2, depends 12-01] ✓
-- [x] 12-03-VERIFY — behavioral verification harness (10/10 PASS: skip-guards, FTD gate, registration/conversion GET shapes, encode-once round-trip, 5xx retry) + whole-chain scoped tsc (0 errors) + DEFERRED post-deploy live Trading Cult checkpoint (SC5) (`12-03-VERIFY.md`) — [wave 3, depends 12-02] ✓
-
-Note: Trading Cult's real registration/conversion URL templates are set at config time via `PUT /api/tracking/settings` AFTER deploy (external partner-spec dependency) — not hardcoded, not a code plan.
+</details>
 
 ## Progress
 

@@ -1,5 +1,33 @@
 # Milestones
 
+## v1.3 — CRM Partner Tracking (S2S Postbacks) (Shipped: 2026-07-01)
+
+**Delivered:** A Trading Cult affiliate partner can attribute registrations and first-sales to their own traffic — a partner `clickid` is captured at a tracking-link entry, persists unchanged through signup and purchase (surviving `req=null` gateway callbacks), and fires S2S GET postbacks (clickid/goal/payout) back to the partner on registration and first-time-deposit conversion.
+
+**Phases completed:** 10-12 (9 plans; 2 deferred post-deploy human-verify checkpoints — 10-04, Phase 12 SC5)
+
+**Key accomplishments:**
+
+- **Partner click capture and signup attribution** — Partner clickids captured via `GET /api/tracking/track`, stored in a first-party `_partner_clickid` cookie, forwarded through the signup form to registration (CRM-01/02/03).
+- **Indexed User and Payment schema persistence** — `partnerClickId` added to the User document and Payment `attribution` subdocument, so it durably survives `req=null` gateway/webhook completion callbacks (CRM-02/03).
+- **Two zero-caller tracking helpers wired live** — `signupCompleted`/`purchaseCompleted` (previously defined but never called) now fire at every registration + payment-completion path incl. the PAP funded-leg, with stable dedup eventIds (`signup:<userId>`, `purchase:<paymentId>`, `pap:<paymentId>`) for cross-minute retry idempotency (CRM-04/05/06/08).
+- **FTD signal without breaking shared destinations** — `isFirstPurchase` flag added to every purchase event; `purchase_completed`/`pap_payment_completed` still fire on every purchase (Meta CAPI/GA4/Klaviyo need all of them) — the once-per-user conversion gate lives in the new adapter, not by suppressing the shared event.
+- **New `partnerPostback` GET adapter** — skip-guard chain, `{clickid}`/`{goal}`/`{payout}`/`{currency}` macro substitution (encode-once), FTD gate, one bounded 5xx retry, never-throws; dedup + delivery-log inherited free from the existing dispatcher (CRM-07/09).
+- **JPY-as-USD bug pre-empted** — `pap_payment_completed`'s payout switched from billed `payAfterPassRemainingPrice` to normalized `usdAmount` at all 3 PAP sites (callback/stripe/fanbasis) before it ever reached a partner payout field.
+
+**Stats:**
+- 20 files across 2 repos (~535 LOC: pft-backend ~528, pft-dashboard ~7)
+- 3 phases, 9 plans (+2 deferred checkpoints), 9 backend commits + 1 dashboard commit
+- Same day (2026-07-01, ~2h50m wall time incl. research + 3 planner/checker/verifier cycles)
+
+**Git range:** pft-backend `feat(10-01)` (`09ca7387`) → `feat(12-02)` (`719e591b`); pft-dashboard `feat(10-01)` (`e111dab1`). All on main-2026.
+
+**Caveat:** Code-complete + code-level verified (each phase: plan-checker + goal-verifier passes; Phase 12's 10-case behavioral harness ran the real adapter logic against stubbed fetch, 10/10 pass, 0 TS errors). No dedicated cross-phase milestone audit run (skipped per user decision — each phase verifier already cross-checked its inputs against the prior phase's outputs). Live human-verify DEFERRED: 10-04 (full capture→persist path) + Phase 12 SC5 (real Trading Cult config + real partner endpoint) — both gated on the next main-2026 deploy AND the partner's registrationUrl/conversionUrl being configured via `PUT /api/tracking/settings`.
+
+**What's next:** Deploy main-2026 → configure Trading Cult's partnerPostback URLs → run the deferred live-verify checklists (10-04 + Phase 12 SC5, see `12-03-VERIFY.md` §4) → reply to source ticket cmqt52jdb001dny0kknkou9x0. Then v1.4: per-trade max used margin in trade history + daily Used-Margin High-Water-Mark series (Trading Cult follow-up on shipped v1.2 Phase 7, ticket cmovizb320007qs0k0fue250p — queued todo). Deferred from v1.3: CRM-10 refund/chargeback reversal postback, CRM-11 pull API, CRM-12 generic multi-partner config.
+
+---
+
 ## v1.2 — Ticket Fixes + PAP Queue Label (Shipped: 2026-07-01)
 
 **Delivered:** Six ticket-driven support/ops fixes swept together after v1.1 — affiliate CSV multi-tier commission sum, Daily P&L orphan-close undercount, funded-queue ready badge, used-margin display, breach-email reason vars — capped by the headline v1.2 feature: the PAP funded-queue state label that replaces the misleading "Program Not Assigned" warning on admin payment rows with the real compliance-gate state.

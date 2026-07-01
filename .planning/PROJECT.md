@@ -1,27 +1,18 @@
-# PFT WhiteLabel — Leaderboard & Competitions + Affiliate Reporting + PAP Queue UX
+# PFT WhiteLabel — Leaderboard & Competitions + Affiliate Reporting + PAP Queue UX + CRM Partner Tracking
 
 ## What This Is
 
-A white-label prop trading platform (pft-dashboard + pft-backend) that lets brands run funded trader challenges. v1.0 added a public funded-trader leaderboard and a monthly competition system. v1.1 added affiliate reporting enhancements (per-purchase commission visibility for affiliates + affiliate columns in admin payment exports). v1.2 (in progress) replaces the misleading "Program Not Assigned" label on PAP funded-leg payments with the real underlying queue state (`Awaiting KYC` / `Awaiting Contract` / `In Funded Queue`) so support stops clicking a dead Retry button.
+A white-label prop trading platform (pft-dashboard + pft-backend) that lets brands run funded trader challenges. v1.0 added a public funded-trader leaderboard and a monthly competition system. v1.1 added affiliate reporting enhancements (per-purchase commission visibility for affiliates + affiliate columns in admin payment exports). v1.2 replaced the misleading "Program Not Assigned" label on PAP funded-leg payments with the real underlying queue state, plus 5 ticket-driven fixes. v1.3 lets an external affiliate partner (Trading Cult) attribute registrations and first-sales to their own tracking links via S2S postbacks (clickid → registration → conversion), extending the existing Tracking/destinations dispatch framework with a new partner-facing adapter.
 
 ## Core Value
 
-Funded traders see where they rank and compete in monthly prize-pool competitions (engagement + brand marketing). Affiliates see exactly which purchases earned them which commissions and can reconcile their earnings per tier; admins can reconcile customer purchases against affiliate payouts directly from the Payment History export. Support and back-office staff see the real reason a PAP funded account has not released (compliance gate, not a system failure) instead of a generic "Not Assigned" warning that invites a useless Retry loop.
+Funded traders see where they rank and compete in monthly prize-pool competitions (engagement + brand marketing). Affiliates see exactly which purchases earned them which commissions and can reconcile their earnings per tier; admins can reconcile customer purchases against affiliate payouts directly from the Payment History export. Support and back-office staff see the real reason a PAP funded account has not released (compliance gate, not a system failure) instead of a generic "Not Assigned" warning that invites a useless Retry loop. External affiliate partners can prove their traffic converts — a `clickid` survives our funnel unchanged and the partner gets an S2S signal the moment it does.
 
-## Current Milestone: v1.3 CRM Partner Tracking (S2S Postbacks)
+## Current Milestone: None — v1.3 shipped 2026-07-01, awaiting next
 
-**Goal:** Let a Trading Cult affiliate partner track registrations and conversions via a tracking link that carries their own `clickid`, by capturing + persisting that clickid unchanged through the signup→purchase funnel and firing S2S postbacks (with clickid + goal + payout) back to the partner on registration and sale.
+v1.3 "CRM Partner Tracking (S2S Postbacks)" (Phases 10-12, 9 plans) is code-complete + code-level verified, pushed to main-2026; live human-verify deferred pending the next deploy AND Trading Cult's real postback URLs (external dependency). Full detail: [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md).
 
-**Target features:**
-- Tracking-link entry captures an arbitrary partner `clickid` (e.g. `/track?clickid={clickid}` or `?clickid=` on a landing URL) and persists it click → registration → sale, unchanged
-- S2S GET postback with `{clickid}` / `goal` / `{payout}` macro substitution fired on registration (`signup_completed`) and conversion/sale (`purchase_completed`), extending the existing `Admin/ConversionWebhook` + `Tracking/destinations` dispatch
-- Minimal/one-off config for THIS partner (Trading Cult) — not a generic multi-partner admin surface (per user decision 2026-07-01)
-
-**Explicitly deferred (not in v1.3):**
-- Pull API (partner alternative B) — postbacks first; API later if the partner needs it
-- Generic per-brand/per-partner postback admin UI — build reusable only when a 2nd partner appears
-
-Full scope in `.planning/REQUIREMENTS.md` (after roadmap). Source ticket: cmqt52jdb001dny0kknkou9x0 (Trading Cult).
+Run `/gsd:new-milestone` to define the next one — candidates in **Next Milestone Goals** below (v1.4 margin-history enhancement is already queued and researched-shape).
 
 ## Requirements
 
@@ -46,14 +37,18 @@ Full scope in `.planning/REQUIREMENTS.md` (after roadmap). Source ticket: cmqt52
 - ✓ Admin sidebar ready-badge on funded queue (KYC+contract approved) — v1.2 Phase 6 (closed by remote)
 - ✓ Used-margin display (current + all-time peak %) on client + admin account views — v1.2 Phase 7
 - ✓ Breach emails interpolate the rule-checker's exact reason (`{ban_reason}` + fields), variables registry 3→20 + per-brand sync migration — v1.2 Phase 8
+- ✓ Partner `clickid` captured at `/api/tracking/track`, persisted unchanged on User + Payment (survives `req=null` gateway callbacks) — v1.3 Phase 10
+- ✓ `signupCompleted`/`purchaseCompleted` tracking events wired at every real completion path incl. PAP + fanbasis, with retry-safe stable eventIds — v1.3 Phase 11
+- ✓ FTD signal (`isFirstPurchase`) on every purchase event without suppressing shared destinations (Meta/GA4/Klaviyo still get every purchase) — v1.3 Phase 11
+- ✓ New `partnerPostback` GET adapter — macro substitution (`{clickid}`/`{goal}`/`{payout}`), encode-once, FTD-gated conversion send, per-brand config, disabled by default — v1.3 Phase 12
 
-<sub>Code-complete + pushed to main-2026 for v1.0, v1.1, and v1.2; live human-verify pending the next deploy unlocks all three.</sub>
+<sub>Code-complete + pushed to main-2026 for v1.0 through v1.3; live human-verify pending the next deploy unlocks all four (v1.3 additionally needs Trading Cult's real postback URLs configured post-deploy).</sub>
 
 ### Active
 
-- [ ] **v1.3 CRM Partner Tracking** — capture + persist a partner `clickid` through signup→purchase; fire S2S postbacks (clickid/goal/payout) on registration + sale for the Trading Cult partner (ticket cmqt52jdb001dny0kknkou9x0). Requirements defined after research.
+(None — v1.3 shipped. Define the next milestone via `/gsd:new-milestone`.)
 
-Candidate v1.3 / v2 scope: **PAP-02** Retry button suppress/relabel + **PAP-03** queue reason staleness (deferred items 2 + 3 from DEV cmqbzq6vc007ds50k008tr3du, now unblocked — label taxonomy locked by Phase 9); winner email notifications + competition history hall of fame + automated prize disbursement (carried from v1.0); broader admin-panel anchor refactor for new-tab/copy-link (DEV ticket cmqztddis); ticket-portal sprint + archive roadmap (Phases 2 & 3 from .planning/feedback notes); JA email localization completion for Trading Cult; **Funding Optimal free-trial program setup** (ops, no code — pending todo, ticket cmnx4jvry0001mr0kezmxcnnv).
+Candidate v1.4 / v2 scope: **v1.4 margin-history enhancement** — per-trade max used margin in trade history + daily Used-Margin High-Water-Mark series, client+admin (ticket cmovizb320007qs0k0fue250p, Trading Cult follow-up on shipped Phase 7, both enhancements in scope — see `.planning/todos/pending/2026-07-01-v1.4-per-trade-margin-and-daily-hwm.md`); **CRM-10/11/12** refund-reversal postback + pull API + generic multi-partner config (v1.3 follow-ups, deferred until a 2nd partner needs them); **PAP-02** Retry button suppress/relabel + **PAP-03** queue reason staleness (deferred items 2 + 3 from DEV cmqbzq6vc007ds50k008tr3du, unblocked since Phase 9); winner email notifications + competition history hall of fame + automated prize disbursement (carried from v1.0); broader admin-panel anchor refactor for new-tab/copy-link (DEV ticket cmqztddis); ticket-portal sprint + archive roadmap (Phases 2 & 3 from .planning/feedback notes); JA email localization completion for Trading Cult; **Funding Optimal free-trial program setup** (ops, no code — pending todo, ticket cmnx4jvry0001mr0kezmxcnnv, blocked on client's Google Ads campaign ending).
 
 ### Out of Scope
 
@@ -66,6 +61,7 @@ Candidate v1.3 / v2 scope: **PAP-02** Retry button suppress/relabel + **PAP-03**
 
 - v1.0: existing admin-only leaderboard already built; added public surface + competition system; ~4,400 LOC across 3 repos
 - v1.1: extended affiliate module (already had `getCommissionsByOrderId` per-order endpoint, MLM tiers, AffiliateCommission collection); added one bulk endpoint + one user-scoped endpoint + UI surfaces; ~549 LOC across 2 repos
+- v1.3: extended the existing Tracking/destinations dispatch framework (already had meta-capi/ga4/klaviyo/conversionWebhook adapters + dedup + delivery-log) with a new partner-facing GET adapter; discovered 2 "wired" tracking helpers (`signupCompleted`/`purchaseCompleted`) had zero real callers; ~535 LOC across 2 repos
 - Backend: Node.js/TypeScript, MongoDB/Mongoose, MT5 integration
 - Frontend: Next.js dashboard (pft-dashboard), per-brand white-label
 - All brands deploy from main-2026
@@ -103,25 +99,31 @@ Candidate v1.3 / v2 scope: **PAP-02** Retry button suppress/relabel + **PAP-03**
 | Margin denominator = `margin/equity*100` (NOT MT5 `marginLevel`); peak is all-time monotonic | Correct "% of account at risk" semantics; peak survives payout/daily/EOD resets | ✓ Good (v1.2 Phase 7) |
 | Breach-email body overwrite gated on strict equality with `OLD_RULE_BREACHED_BODY`; variables union-merged | Preserves admin customisations; never shrinks an existing registry | ✓ Good (v1.2 Phase 8) |
 | Defer-to-remote: fetch origin/main-2026 before editing; if bug already closed by a different shape, fast-forward | Prevents overwriting a teammate's deployed hotfix (Phase 6 fully, Phase 4.1 Bugs 2+3) | ✓ Good — locked convention (`feedback_rebase_when_remote_already_fixed.md`) |
+| `partnerClickId` persisted on BOTH User doc AND Payment `attribution` | Purchase-completion paths run with `req=null` (gateway/webhook callbacks) — no cookie available there; the Payment doc makes it resolvable server-side | ✓ Good (v1.3 Phase 10) |
+| FTD = `isFirstPurchase` flag on every purchase event, NOT event suppression | `purchase_completed`/`pap_payment_completed` are shared multi-destination events (Meta/GA4/Klaviyo need every purchase); the once-per-user conversion gate lives in the partner adapter instead | ✓ Good (v1.3 Phase 11) |
+| New `partnerPostback` adapter instead of reusing `conversionWebhook` | Wrong wire protocol (POST/JSON/HMAC vs required GET/macro) + wrong event map | ✓ Good (v1.3 Phase 12) |
+| Stable eventIds (`signup:<userId>`, `purchase:<paymentId>`, `pap:<paymentId>`) passed explicitly to every emit | Default `deterministicEventId` is minute-bucketed — insufficient for gateway-webhook retries arriving minutes later | ✓ Good (v1.3 Phase 11) |
+| Minimal one-off config for Trading Cult (`TrackingSettings.destinations.partnerPostback`), not a generic multi-partner UI | Only one partner today; build reusable only when a 2nd partner appears | ✓ Good — locked (v1.3), applies to any future single-partner integration |
 
 ## Current State
 
-**Shipped:** v1.0 Leaderboard & Competitions (2026-06-29) + v1.1 Affiliate Reporting (2026-06-30) + v1.2 Ticket Fixes + PAP Queue Label (2026-07-01) — all code-complete, pushed to main-2026, live human-verify pending the next deploy (unlocks all three).
+**Shipped:** v1.0 Leaderboard & Competitions (2026-06-29) + v1.1 Affiliate Reporting (2026-06-30) + v1.2 Ticket Fixes + PAP Queue Label (2026-07-01) + v1.3 CRM Partner Tracking (2026-07-01) — all code-complete, pushed to main-2026, live human-verify pending the next deploy (unlocks all four; v1.3 additionally needs Trading Cult's real postback URLs configured post-deploy).
 
-**Codebase:** ~4,950 LOC (v1.0/v1.1) plus v1.2's cross-repo ticket fixes across pft-backend, pft-dashboard, pft-rule-checker (7 plans, 2 closed-by-remote). Stack unchanged: Next.js + Node/TS + MongoDB; no new deps. Reusable patterns established: bulk-by-orders POST `$in` (v1.1); `paymentId`-keyed queue batch join mirrored into admin (v1.2).
+**Codebase:** ~4,950 LOC (v1.0/v1.1) plus v1.2's cross-repo ticket fixes (7 plans) plus v1.3's partner-tracking extension (~535 LOC, 9 plans across pft-backend + pft-dashboard). Stack unchanged: Next.js + Node/TS + MongoDB; no new deps across any milestone. Reusable patterns established: bulk-by-orders POST `$in` (v1.1); `paymentId`-keyed queue batch join mirrored into admin (v1.2); new destination-adapter pattern for external partner integrations, dedup/delivery-log inherited free from the dispatcher (v1.3).
 
-**Source tickets:** v1.0 = cmqybawiz007zny0k1wliphj7 (XPIPS). v1.1 = cmqqchwh500bspi0kxw23o2rl (Trading Cult). v1.2 = DEV cmqbzq6vc007ds50k008tr3du (PAP-01/Phase 9) + Trading Cult/XPIPS/FO ticket fixes (Phases 4.1–8). All flip WAITING_CLIENT after deploy + verify.
+**Source tickets:** v1.0 = cmqybawiz007zny0k1wliphj7 (XPIPS). v1.1 = cmqqchwh500bspi0kxw23o2rl (Trading Cult). v1.2 = DEV cmqbzq6vc007ds50k008tr3du (PAP-01/Phase 9) + Trading Cult/XPIPS/FO ticket fixes (Phases 4.1–8). v1.3 = cmqt52jdb001dny0kknkou9x0 (Trading Cult Pro). All flip WAITING_CLIENT after deploy + verify.
 
-**Open (post-deploy human-verify, all gated on the next main-2026 deploy):** v1.0 Phases 2 & 3 (anon masking, opt-out, competition close, cache isolation); v1.1 Phase 4 (Purchase Report card + admin CSV cols + single-POST); v1.2 Phases 4.1–9 (CSV tier-sum; daily P&L TC acct 13535; funded-queue badge; margin card client+admin; breach-email body per brand XPIPS+FO; PAP queue label NSF payment 6a2c08b1ab4caef5631099a2 → "Awaiting KYC").
+**Open (post-deploy human-verify, all gated on the next main-2026 deploy):** v1.0 Phases 2 & 3 (anon masking, opt-out, competition close, cache isolation); v1.1 Phase 4 (Purchase Report card + admin CSV cols + single-POST); v1.2 Phases 4.1–9 (CSV tier-sum; daily P&L TC acct 13535; funded-queue badge; margin card client+admin; breach-email body per brand XPIPS+FO; PAP queue label NSF payment 6a2c08b1ab4caef5631099a2 → "Awaiting KYC"); v1.3 Phase 10 (10-04, full capture→persist path) + Phase 12 (SC5, live Trading Cult postback — ALSO needs Trading Cult's real registrationUrl/conversionUrl set via `PUT /api/tracking/settings`, not just a deploy).
 
 ## Next Milestone Goals
 
 Define via `/gsd:new-milestone`. Candidates:
-- **v1.4 Margin history enhancement (queued, after v1.3):** per-trade max used margin in the dashboard trade history + a daily Used-Margin High-Water-Mark series, client + admin — Trading Cult follow-up on the shipped Phase 7 MarginUsageCard (ticket cmovizb320007qs0k0fue250p, client confirmed Phase 7 works + requested this 2026-07-01). Both enhancements in scope; research-first (per-trade margin capture in the rule-checker is the open question). See `.planning/todos/pending/2026-07-01-v1.4-per-trade-margin-and-daily-hwm.md`.
-- **Ops (no code, actionable now):** Funding Optimal free-trial program setup (ticket cmnx4jvry0001mr0kezmxcnnv — pending todo).
-- **v1.3 PAP follow-ups (unblocked by Phase 9):** PAP-02 Retry button suppress/relabel + PAP-03 queue reason staleness.
-- **Post-deploy:** run all batched human-verify checklists (v1.0 → v1.2), then admin-panel anchor-link refactor (DEV cmqztddis).
+- **v1.4 Margin history enhancement (queued, research-shaped):** per-trade max used margin in the dashboard trade history + a daily Used-Margin High-Water-Mark series, client + admin — Trading Cult follow-up on the shipped Phase 7 MarginUsageCard (ticket cmovizb320007qs0k0fue250p, client confirmed Phase 7 works + requested this 2026-07-01). Both enhancements in scope; research-first (per-trade margin capture in the rule-checker is the open question). See `.planning/todos/pending/2026-07-01-v1.4-per-trade-margin-and-daily-hwm.md`.
+- **v1.3 follow-ups (deferred by design):** CRM-10 refund/chargeback reversal postback, CRM-11 pull API, CRM-12 generic multi-partner config — build when a 2nd partner needs them.
+- **Ops (no code, blocked on client):** Funding Optimal free-trial program setup (ticket cmnx4jvry0001mr0kezmxcnnv — pending todo, waiting on client's Google Ads campaign to end).
+- **PAP follow-ups (unblocked since Phase 9):** PAP-02 Retry button suppress/relabel + PAP-03 queue reason staleness.
+- **Post-deploy:** run all batched human-verify checklists (v1.0 → v1.3), configure Trading Cult's partnerPostback URLs, then admin-panel anchor-link refactor (DEV cmqztddis).
 - **v2 substantive:** winner email notifications + competition history + automated prize disbursement (carried from v1.0).
 
 ---
-*Last updated: 2026-07-01 after starting v1.3 CRM Partner Tracking milestone*
+*Last updated: 2026-07-01 after v1.3 CRM Partner Tracking milestone completion*
