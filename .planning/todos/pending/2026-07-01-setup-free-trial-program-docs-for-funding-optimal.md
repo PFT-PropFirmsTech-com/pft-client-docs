@@ -27,4 +27,8 @@ No separate Funding Optimal marketing site exists in this workspace (`pft-web` i
 3. Hand FO the resulting claim URL: `<FO-dashboard-domain>/c/<slug>`.
 4. Reply on ticket cmnx4jvry0001mr0kezmxcnnv with the link + a short "here's how to market it" note (it's their marketing site, their job to embed it).
 
-Deferred until after v1.2 Phase 9 (user's explicit priority call, 2026-07-01).
+## BLOCKED — client-requested hold (2026-07-01)
+
+Client (Fitim, Funding Optimal) confirmed they DO want the free trial, but asked us NOT to make website changes yet: they have an **active Google Ads campaign** and changing the site mid-campaign would disrupt it. Free-trial go-live is on hold **until the client signals their Google Ads campaign has ended** (Bob: "tell me when the campaign finishes"). Ticket cmnx4jvry set WAITING_CLIENT.
+
+Note: the Program-doc creation itself (steps 1-3 above) is backend/DB-only and does NOT touch the website — could technically be staged now. But hold the whole thing per the client's request until they give the go-ahead, so nothing surfaces on their site mid-campaign. Resume trigger: client says campaign done.
