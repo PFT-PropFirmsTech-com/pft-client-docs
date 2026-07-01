@@ -117,6 +117,7 @@ Candidate v1.3 / v2 scope: **PAP-02** Retry button suppress/relabel + **PAP-03**
 ## Next Milestone Goals
 
 Define via `/gsd:new-milestone`. Candidates:
+- **v1.4 Margin history enhancement (queued, after v1.3):** per-trade max used margin in the dashboard trade history + a daily Used-Margin High-Water-Mark series, client + admin — Trading Cult follow-up on the shipped Phase 7 MarginUsageCard (ticket cmovizb320007qs0k0fue250p, client confirmed Phase 7 works + requested this 2026-07-01). Both enhancements in scope; research-first (per-trade margin capture in the rule-checker is the open question). See `.planning/todos/pending/2026-07-01-v1.4-per-trade-margin-and-daily-hwm.md`.
 - **Ops (no code, actionable now):** Funding Optimal free-trial program setup (ticket cmnx4jvry0001mr0kezmxcnnv — pending todo).
 - **v1.3 PAP follow-ups (unblocked by Phase 9):** PAP-02 Retry button suppress/relabel + PAP-03 queue reason staleness.
 - **Post-deploy:** run all batched human-verify checklists (v1.0 → v1.2), then admin-panel anchor-link refactor (DEV cmqztddis).
