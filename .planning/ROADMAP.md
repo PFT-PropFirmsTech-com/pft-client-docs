@@ -96,9 +96,9 @@ Note: partner-facing tracking URL is `/api/tracking/track?clickid=…` (mounted 
 **Plans:** 3 plans (11-01 in Wave 1 = shared type extension + signup wiring; 11-02 + 11-03 in Wave 2, parallel — disjoint files)
 
 Plans:
-- [ ] 11-01: Extend `ITrackingEventPayload` + helper signatures with `partnerClickId`/`isFirstPurchase`/stable `eventId`; wire `TrackingEvents.signupCompleted()` at both registration-completion sites (CRM-04) — [wave 1]
-- [ ] 11-02: `emitTrackingPurchaseCompleted` utility (attribution.partnerClickId + usdAmount + FTD flag + PAP-skip + stable eventId) wired at standard completion sites; thread partnerClickId+usdAmount+stable eventId into existing `papPaymentCompleted` calls; audit fanbasis PAP path (CRM-05, CRM-06) — [wave 2]
-- [ ] 11-03: CRM-08 dual-dispatch audit (legacy `ConversionWebhookEventsService` disjoint) + dedup verification (stable eventIds make retries idempotent) → `11-DEDUP-AUDIT.md` (CRM-08) — [wave 2]
+- [x] 11-01: Extend `ITrackingEventPayload` + helper signatures with `partnerClickId`/`isFirstPurchase`/stable `eventId`; wire `TrackingEvents.signupCompleted()` at both registration-completion sites (backend `8e2f7509`+`44deb3d4`) (CRM-04) — [wave 1] ✓
+- [x] 11-02: `emitTrackingPurchaseCompleted` utility (attribution.partnerClickId + usdAmount + FTD flag + PAP-skip + stable eventId) wired at 4 standard completion sites; `papPaymentCompleted` at 3 sites switched to usdAmount (JPY bug) + partnerClickId + stable eventId; fanbasis DOES provision PAP → wired there too (backend `644ccd39`+`982ba9a1`) (CRM-05, CRM-06) — [wave 2] ✓
+- [x] 11-03: CRM-08 dual-dispatch audit — legacy `ConversionWebhookEventsService` (6 methods, KYC/payout/challenge only) confirmed disjoint from signup/purchase/pap; stable eventIds make retries idempotent → `11-DEDUP-AUDIT.md` (`8540f5a`) (CRM-08) — [wave 2] ✓
 
 #### Phase 12: partnerPostback Adapter + Config + Verify
 
@@ -137,5 +137,5 @@ Plans:
 | 8. Breach Email Template Vars | v1.2 | 1/1 | ✓ Complete (ops sync + verify pending deploy) | 2026-06-30 |
 | 9. PAP Funded Queue State Label | v1.2 | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-07-01 |
 | 10. Capture & Persist | v1.3 | 3/4 | ✓ Complete (code; 10-04 human-verify pending deploy) | 2026-07-01 |
-| 11. Wire Emits + Dedup | v1.3 | 0/3 | Planned | - |
+| 11. Wire Emits + Dedup | v1.3 | 3/3 | ✓ Complete (code; live event-firing verify post-deploy) | 2026-07-01 |
 | 12. partnerPostback Adapter + Config + Verify | v1.3 | 0/3 | Not started | - |

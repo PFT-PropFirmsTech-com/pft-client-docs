@@ -11,10 +11,10 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 Phase: 11 of 12 (Wire Emits + Dedup) — COMPLETE
 Plan: 3/3 (all plans complete)
-Status: 11-03 complete (8540f5a). CRM-08 audit confirms disjoint event surfaces + stable eventId dedup. Phase 11 fully done; ready for Phase 12.
-Last activity: 2026-07-01 — 11-03 executed (8540f5a CRM-08 dual-path audit + dedup verification doc)
+Status: Phase 11 code-complete + pushed to origin/main-2026 (8e2f7509/44deb3d4/644ccd39/982ba9a1/8540f5a). Verifier 6/6 passed, no Phase-12 scope leak. Ready to plan Phase 12.
+Last activity: 2026-07-01 — Phase 11 executed + verified (signup/purchase/PAP emits wired, FTD flag, dedup audit)
 
-**Phase 11 handoff:** `partnerClickId` now lives on the User doc + Payment `attribution` (server-authoritative from user doc). Partner tracking URL = `/api/tracking/track?clickid=…`. Phase 11 reads `user.partnerClickId` at signup sites and `payment.attribution.partnerClickId` at purchase sites. 11-01 wired signupCompleted (zero→2 callers). 11-02 wired purchaseCompleted at all standard sites + fixed papPaymentCompleted (usdAmount, currency:USD, stable eventId, partnerClickId). 11-03 (dedup/config) is next.
+**Phase 12 handoff:** Events now FIRE with all partner data: `signup_completed` (eventId `signup:<userId>` + partnerClickId), `purchase_completed` (eventId `purchase:<paymentId>` + partnerClickId + usdAmount + currency:USD + `isFirstPurchase` flag), `pap_payment_completed` (eventId `pap:<paymentId>` + partnerClickId + usdAmount). Phase 12 builds `destinations/partner-postback.ts` (GET + macro), routes these events → partnerPostback:true in tracking.constants, gates the CONVERSION send on `isFirstPurchase===true` (FTD once-per-user), and reads per-brand config from `TrackingSettings.destinations.partnerPostback` (Trading Cult). Free-trial/$0 = registration postback only. Dedup + eventIds already retry-safe (11-DEDUP-AUDIT.md).
 
 Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████░░░░] 67% (6/9 plans)
 
