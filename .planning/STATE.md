@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state. Trading Cult affiliate partner attributes registrations and conversions via S2S postbacks.
-**Current focus:** v1.3 CRM Partner Tracking — Phase 10: Capture & Persist (ready to plan)
+**Current focus:** v1.3 CRM Partner Tracking — Phase 10: Capture & Persist (complete)
 
 ## Current Position
 
 Phase: 10 of 12 (Capture & Persist)
-Plan: 2 of 3 in Phase 10
-Status: In progress
-Last activity: 2026-07-01 — Completed 10-02-PLAN.md (CRM-02 User partnerClickId schema + interface)
+Plan: 3 of 3 in Phase 10
+Status: Phase complete
+Last activity: 2026-07-01 — Completed 10-03-PLAN.md (CRM-03 Payment attribution.partnerClickId persist at checkout + PAP)
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██░░░░░░░░] 22% (2/9 plans)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [███░░░░░░░] 33% (3/9 plans)
 
 **Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT).
 
@@ -37,7 +37,12 @@ Progress: v1.0 [██████████] 100% (10/10) · v1.1 [███�
 
 ### Decisions
 
-Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (10-02 additions):
+Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (10-03 additions):
+- mergedAttribution pattern: spread client attribution (fbc/gclid/etc) then overlay user.partnerClickId — preserves ad-platform ids, server-authoritative for partner clickid
+- PAP funded-leg attribution: only partnerClickId in the object (no ad-platform ids on PAP path); undefined (not {}) when absent — skip-when-absent for Mongo field omission
+- Payment attribution.partnerClickId now stored at checkout creation time → survives req=null gateway/webhook callbacks in Phase 11/12
+
+v1.3 locked decisions (10-02 additions):
 - TUser also needs partnerClickId (not just TRegisterUser) — UserSchema is typed with TUser; TS2353 without it
 - No default/trim/lowercase on partnerClickId schema field — byte-identical storage required for partner echo-back
 - CRM field pattern: add to TUser + TRegisterUser + UserSchema (3 places, same auth file pair)
@@ -70,5 +75,5 @@ v1.3 base locked decisions:
 ## Session Continuity
 
 Last session: 2026-07-01
-Stopped at: 10-02 complete — CRM-02 partnerClickId on TUser + TRegisterUser + UserSchema, pushed to main-2026 (d2992553). Ready for 10-03 (TrackingSettings schema).
-Resume file: .planning/phases/10-capture-persist/10-03-PLAN.md (next plan to execute)
+Stopped at: 10-03 complete — CRM-03 attribution.partnerClickId on PaymentAttribution interface + Payment schema + both create sites (standard + PAP), pushed to main-2026 (4a079169). Phase 10 complete. Ready for Phase 11 (Tracking Events).
+Resume file: .planning/phases/11-tracking-events/ (next phase)
