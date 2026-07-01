@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 ## Current Position
 
 Phase: 10 of 12 (Capture & Persist)
-Plan: 1 of 3 in Phase 10
+Plan: 2 of 3 in Phase 10
 Status: In progress
-Last activity: 2026-07-01 — Completed 10-01-PLAN.md (CRM-01 cookie capture + signup forward)
+Last activity: 2026-07-01 — Completed 10-02-PLAN.md (CRM-02 User partnerClickId schema + interface)
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [█░░░░░░░░░] 11% (1/9 plans)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██░░░░░░░░] 22% (2/9 plans)
 
 **Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT).
 
@@ -37,7 +37,12 @@ Progress: v1.0 [██████████] 100% (10/10) · v1.1 [███�
 
 ### Decisions
 
-Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (10-01 additions):
+Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (10-02 additions):
+- TUser also needs partnerClickId (not just TRegisterUser) — UserSchema is typed with TUser; TS2353 without it
+- No default/trim/lowercase on partnerClickId schema field — byte-identical storage required for partner echo-back
+- CRM field pattern: add to TUser + TRegisterUser + UserSchema (3 places, same auth file pair)
+
+v1.3 locked decisions (10-01 additions):
 - `_partner_clickid` cookie: `httpOnly:false` (required so js-cookie browser-side can read it for signup forward)
 - Raw-value passthrough contract: backend `/track` sets raw, dashboard forwards raw, Phase 12 encodes once at S2S send
 - Open-redirect guard on `?redirect=`: must start with `/` but NOT `//` (blocks protocol-relative hijack)
@@ -65,5 +70,5 @@ v1.3 base locked decisions:
 ## Session Continuity
 
 Last session: 2026-07-01
-Stopped at: 10-01 complete — CRM-01 backend `/track` route + dashboard signup forward pushed to main-2026 (both repos). Ready for 10-02 (schema/persist).
-Resume file: .planning/phases/10-capture-persist/10-02-PLAN.md (next plan to execute)
+Stopped at: 10-02 complete — CRM-02 partnerClickId on TUser + TRegisterUser + UserSchema, pushed to main-2026 (d2992553). Ready for 10-03 (TrackingSettings schema).
+Resume file: .planning/phases/10-capture-persist/10-03-PLAN.md (next plan to execute)
