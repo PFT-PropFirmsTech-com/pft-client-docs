@@ -1,12 +1,23 @@
-# PFT WhiteLabel — Leaderboard & Competitions + Affiliate Reporting
+# PFT WhiteLabel — Leaderboard & Competitions + Affiliate Reporting + PAP Queue UX
 
 ## What This Is
 
-A white-label prop trading platform (pft-dashboard + pft-backend) that lets brands run funded trader challenges. v1.0 added a public funded-trader leaderboard and a monthly competition system. v1.1 added affiliate reporting enhancements (per-purchase commission visibility for affiliates + affiliate columns in admin payment exports).
+A white-label prop trading platform (pft-dashboard + pft-backend) that lets brands run funded trader challenges. v1.0 added a public funded-trader leaderboard and a monthly competition system. v1.1 added affiliate reporting enhancements (per-purchase commission visibility for affiliates + affiliate columns in admin payment exports). v1.2 (in progress) replaces the misleading "Program Not Assigned" label on PAP funded-leg payments with the real underlying queue state (`Awaiting KYC` / `Awaiting Contract` / `In Funded Queue`) so support stops clicking a dead Retry button.
 
 ## Core Value
 
-Funded traders see where they rank and compete in monthly prize-pool competitions (engagement + brand marketing). Affiliates see exactly which purchases earned them which commissions and can reconcile their earnings per tier; admins can reconcile customer purchases against affiliate payouts directly from the Payment History export.
+Funded traders see where they rank and compete in monthly prize-pool competitions (engagement + brand marketing). Affiliates see exactly which purchases earned them which commissions and can reconcile their earnings per tier; admins can reconcile customer purchases against affiliate payouts directly from the Payment History export. Support and back-office staff see the real reason a PAP funded account has not released (compliance gate, not a system failure) instead of a generic "Not Assigned" warning that invites a useless Retry loop.
+
+## Current Milestone: v1.2 PAP Funded Queue State Label
+
+**Goal:** Replace the misleading "Program Not Assigned" warning on PAP funded-leg payment rows with the actual `fundedprogressionqueues` state, so support stops mistaking a KYC compliance gate for a technical failure.
+
+**Target features:**
+- Real queue-state label ("Awaiting KYC" / "Awaiting Contract" / "In Funded Queue") when a `fundedprogressionqueues` entry exists in `pending`/`processing` for the payment's user + funded programId (Item 1 from DEV cmqbzq6vc007ds50k008tr3du)
+
+**Explicitly deferred (not in v1.2):**
+- Retry button suppress/relabel (Item 2) — depends on final label taxonomy from Item 1
+- Queue `reason` field staleness fix (Item 3) — cosmetic backend-only, low priority
 
 ## Requirements
 
@@ -30,9 +41,9 @@ Funded traders see where they rank and compete in monthly prize-pool competition
 
 ### Active
 
-(None — v1.1 shipped. Define next milestone via `/gsd:new-milestone`.)
+- [ ] **PAP-01**: Admin payments view shows the actual `fundedprogressionqueues` state ("Awaiting KYC" / "Awaiting Contract" / "In Funded Queue") for PAP funded-leg rows, replacing the misleading generic "Program Not Assigned" warning when a queue entry exists in `pending`/`processing`.
 
-Candidate v1.2 / v2 scope: winner email notifications + competition history hall of fame + automated prize disbursement (carried from v1.0); broader admin-panel anchor refactor for new-tab/copy-link (DEV ticket cmqztddis); ticket-portal sprint + archive roadmap (Phases 2 & 3 from .planning/feedback notes); JA email localization completion for Trading Cult.
+Candidate v1.3 / v2 scope: PAP Retry button suppress/relabel + queue reason staleness (deferred items 2 + 3 from DEV cmqbzq6vc007ds50k008tr3du); winner email notifications + competition history hall of fame + automated prize disbursement (carried from v1.0); broader admin-panel anchor refactor for new-tab/copy-link (DEV ticket cmqztddis); ticket-portal sprint + archive roadmap (Phases 2 & 3 from .planning/feedback notes); JA email localization completion for Trading Cult.
 
 ### Out of Scope
 
@@ -95,4 +106,4 @@ Define via `/gsd:new-milestone`. Candidates:
 - v2 substantive: winner email notifications + competition history + automated prize disbursement (carried from v1.0)
 
 ---
-*Last updated: 2026-06-30 after v1.1 milestone*
+*Last updated: 2026-07-01 after starting v1.2 milestone*

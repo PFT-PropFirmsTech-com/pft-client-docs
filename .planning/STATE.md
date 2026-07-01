@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-30)
+See: .planning/PROJECT.md (updated 2026-07-01)
 
-**Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown; admins reconcile commissions in Payment History CSV.
-**Current focus:** v1.1 milestone complete — planning next milestone (`/gsd:new-milestone`)
+**Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state instead of a misleading "Program Not Assigned" warning.
+**Current focus:** v1.2 milestone — PAP Funded Queue State Label (defining requirements)
 
 ## Current Position
 
-Phase: 8 — Breach Email Template Vars (ad-hoc, post-v1.1) — COMPLETE
-Plan: 08-01 COMPLETE — rule_breached seed body + variables registry extended + per-brand sync migration shipped; ops verification DEFERRED
-Status: 08-01 committed pft-backend `62175f4f` (templateAutoCreator, +33/-2) + `20ec2680` (sync-rule-breached-template-vars.ts NEW, +161); both PUSHED to origin/main-2026; NOT deployed
-Last activity: 2026-06-30 — 08-01 shipped after Phase 7
+Phase: Not started (defining requirements)
+Plan: —
+Status: v1.2 milestone started — defining requirements for PAP-01 (Real queue-state label on admin payments view for PAP funded legs)
+Last activity: 2026-07-01 — milestone v1.2 initialized
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · Phase 4.1 [██████████] 100% (1/1) · Phase 5 [██████████] 100% (1/1) · Phase 6 [██████████] 100% (1/1) · Phase 7 [██████████] 100% (2/2 — persistence 07-01 + widget 07-02) · Phase 8 [██████████] 100% (1/1 — rule_breached seed + sync script)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · Phase 4.1 [██████████] 100% (1/1) · Phase 5 [██████████] 100% (1/1) · Phase 6 [██████████] 100% (1/1) · Phase 7 [██████████] 100% (2/2) · Phase 8 [██████████] 100% (1/1) · v1.2 [░░░░░░░░░░] 0% (0/? — planning)
 
 **Open across both milestones (post-deploy):** v1.0 live human-verify (Phases 2 & 3 — anon masking, opt-out, competition close, cache isolation) + v1.1 live human-verify (Phase 4 — Purchase Report card render, Export CSV downloads, showOverview-only scoping, 6 admin CSV cols populated, single-POST network pattern). All gated on next main-2026 deploy. Tracked in phase SUMMARYs.
 
