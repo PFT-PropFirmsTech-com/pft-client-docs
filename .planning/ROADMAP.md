@@ -79,25 +79,26 @@ Note: partner-facing tracking URL is `/api/tracking/track?clickid=…` (mounted 
 
 #### Phase 11: Wire Emits + Dedup
 
-**Goal:** The two tracking helpers that have zero callers today (`TrackingEvents.signupCompleted()` and `.purchaseCompleted()`) are wired at their real call sites — registration completion and all payment-completion paths including the currently-unwired PAP path — threading `partnerClickId` + `usdAmount` + `currency=USD` through each; a FTD (first-purchase) guard prevents repeat conversion fires; and a dual-dispatch audit ensures the existing legacy `ConversionWebhookEventsService` path cannot double-fire the same event.
+**Goal:** The two tracking helpers that have zero callers today (`TrackingEvents.signupCompleted()` and `.purchaseCompleted()`) are wired at their real call sites — registration completion and all payment-completion paths including the PAP path — threading `partnerClickId` + `usdAmount` + `currency=USD` through each; an FTD (first-purchase) FLAG is produced on every purchase event; and a dual-dispatch audit ensures the legacy `ConversionWebhookEventsService` path cannot double-fire the same event.
 
 **Depends on:** Phase 10 (partnerClickId must be on User + Payment docs before emit sites can read it)
 
 **Requirements:** CRM-04, CRM-05, CRM-06, CRM-08
 
 **Success Criteria** (what must be TRUE when Phase 11 completes):
-1. After a user completes OTP registration, the `signup_completed` tracking event fires exactly once (verified via `TrackingEventLog`); a second OTP submission for the same user does not produce a second log entry.
-2. After a user's first completed payment (standard challenge or PAP funded-leg), the `purchase_completed` tracking event fires exactly once carrying `partnerClickId`, `usdAmount`, and `currency: "USD"`.
-3. A second completed payment by the same user does NOT produce a second `purchase_completed` tracking event (FTD guard confirmed).
-4. The PAP funded-leg payment-completion path (`pap_payment_completed`) emits the purchase event — confirmed by a `TrackingEventLog` entry for a PAP payment.
-5. A dual-dispatch audit of `ConversionWebhookEventsService` call sites confirms no event that now fires via the Tracking path can also double-fire via the legacy direct path.
+1. After a user completes registration (one-step OR two-step OTP), the `signup_completed` tracking event fires carrying the user's `partnerClickId` when present; a repeat submission for the same user dedups to one event (stable `signup:<userId>` eventId).
+2. After a user's completed payment (standard challenge or PAP funded-leg), a purchase event fires carrying `partnerClickId`, `usdAmount`, and `currency: "USD"` — resolved from `payment.attribution.partnerClickId` (works in a `req=null` gateway callback).
+3. Each purchase event carries an `isFirstPurchase` boolean FTD flag (computed via `Payment.countDocuments({userId, status:"completed"})`). `purchase_completed` / `pap_payment_completed` are NOT suppressed on repeat purchases (Meta/GA4/Klaviyo consume every purchase) — the once-per-user conversion guarantee is enforced in Phase 12 by gating the partner conversion send on `isFirstPurchase === true`.
+4. A PAP funded-leg completion fires exactly ONE partner-conversion-eligible event (`pap_payment_completed`, using `usdAmount` not the billed `payAfterPassRemainingPrice`) and does NOT also fire `purchase_completed` for the same payment (`emitTrackingPurchaseCompleted` early-returns for PAP legs). A free $0 purchase produces no conversion-eligible event.
+5. Retries are idempotent: purchase/PAP emits pass a stable `purchase:<paymentId>` / `pap:<paymentId>` eventId so gateway-webhook re-delivery collapses to one event (the default `deterministicEventId` only dedups within a minute).
+6. A dual-dispatch audit of `ConversionWebhookEventsService` confirms it fires only KYC/payout/challenge lifecycle events — disjoint from the new Tracking signup/purchase events, so no double-fire.
 
-**Plans:** TBD
+**Plans:** 3 plans (11-01 in Wave 1 = shared type extension + signup wiring; 11-02 + 11-03 in Wave 2, parallel — disjoint files)
 
 Plans:
-- [ ] 11-01: Wire `TrackingEvents.signupCompleted()` at registration callsite + `partnerClickId` on `ITrackingEventPayload` (CRM-04)
-- [ ] 11-02: `trackingPurchaseEmit` utility + wire at all paid-completion paths incl. PAP (CRM-05, CRM-06) + FTD guard
-- [ ] 11-03: Dual-dispatch audit — confirm `ConversionWebhookEventsService` call sites do not overlap new Tracking path (CRM-08) + `TrackingEventLog` dedup verification
+- [ ] 11-01: Extend `ITrackingEventPayload` + helper signatures with `partnerClickId`/`isFirstPurchase`/stable `eventId`; wire `TrackingEvents.signupCompleted()` at both registration-completion sites (CRM-04) — [wave 1]
+- [ ] 11-02: `emitTrackingPurchaseCompleted` utility (attribution.partnerClickId + usdAmount + FTD flag + PAP-skip + stable eventId) wired at standard completion sites; thread partnerClickId+usdAmount+stable eventId into existing `papPaymentCompleted` calls; audit fanbasis PAP path (CRM-05, CRM-06) — [wave 2]
+- [ ] 11-03: CRM-08 dual-dispatch audit (legacy `ConversionWebhookEventsService` disjoint) + dedup verification (stable eventIds make retries idempotent) → `11-DEDUP-AUDIT.md` (CRM-08) — [wave 2]
 
 #### Phase 12: partnerPostback Adapter + Config + Verify
 
@@ -110,7 +111,7 @@ Plans:
 **Success Criteria** (what must be TRUE when Phase 12 completes):
 1. A `destinations/partner-postback.ts` adapter exists, implements `IDestinationAdapter`, and is registered in `destinations/index.ts`; it returns `status: "skipped"` when `partnerClickId` is absent or the URL template is empty.
 2. When a `signup_completed` event fires for a user with a `partnerClickId`, the adapter issues a GET request to the configured registration URL template with `{clickid}` URL-encoded in the query string and `goal=registration`; a delivery-log record is written.
-3. When a `purchase_completed` event fires for a user with a `partnerClickId`, the adapter issues a GET request to the configured conversion URL template with `{clickid}` URL-encoded, `goal=conversion`, and `payout=<usdAmount>` + `currency=USD`; a delivery-log record is written.
+3. When a `purchase_completed` / `pap_payment_completed` event fires for a user with a `partnerClickId` AND `isFirstPurchase === true`, the adapter issues a GET request to the configured conversion URL template with `{clickid}` URL-encoded, `goal=conversion`, and `payout=<usdAmount>` + `currency=USD`; a delivery-log record is written. Repeat purchases (`isFirstPurchase:false`) do NOT send the conversion postback.
 4. A `partnerClickId` value containing URL-special characters (e.g. `+`, `=`, `/`) is correctly `encodeURIComponent`-ed before substitution — the partner receives the exact original value.
 5. [POST-DEPLOY CHECKPOINT — deferred] Trading Cult live traffic: a test registration via a partner tracking link produces a delivery-log entry with `status: "sent"` and the partner's tracking system shows the registration event.
 
@@ -118,7 +119,7 @@ Plans:
 
 Plans:
 - [ ] 12-01: `TrackingSettings.destinations.partnerPostback` config shape + model + interface (CRM-09) + Trading Cult DB seed
-- [ ] 12-02: `destinations/partner-postback.ts` adapter — GET fetch, `expandMacros()`, `encodeURIComponent`, skip guards, delivery log, fire-and-forget wrapper (CRM-07)
+- [ ] 12-02: `destinations/partner-postback.ts` adapter — GET fetch, `expandMacros()`, `encodeURIComponent`, skip guards (incl. `isFirstPurchase` gate for conversion), delivery log, fire-and-forget wrapper (CRM-07)
 - [ ] 12-03: Register adapter + end-to-end integration verify (registration postback + conversion postback + URL-special-char clickid test)
 
 ## Progress
@@ -136,5 +137,5 @@ Plans:
 | 8. Breach Email Template Vars | v1.2 | 1/1 | ✓ Complete (ops sync + verify pending deploy) | 2026-06-30 |
 | 9. PAP Funded Queue State Label | v1.2 | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-07-01 |
 | 10. Capture & Persist | v1.3 | 3/4 | ✓ Complete (code; 10-04 human-verify pending deploy) | 2026-07-01 |
-| 11. Wire Emits + Dedup | v1.3 | 0/3 | Not started | - |
+| 11. Wire Emits + Dedup | v1.3 | 0/3 | Planned | - |
 | 12. partnerPostback Adapter + Config + Verify | v1.3 | 0/3 | Not started | - |
