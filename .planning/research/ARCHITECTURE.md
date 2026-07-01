@@ -1,366 +1,310 @@
-# Architecture Patterns
+# Architecture Research: CRM Partner S2S Postback (v1.3)
 
-**Domain:** Public Leaderboard + Competition System — integration with existing PFT platform
-**Researched:** 2026-06-28
-
----
-
-## Existing Architecture (What Already Exists)
-
-### Leaderboard Module (pft-backend)
-
-| File | Role |
-|------|------|
-| `leaderboard.model.ts` | Precomputed `Leaderboard` collection — one doc per `{userId, programId}` pair |
-| `leaderboard.service.ts` | `LeaderboardService` — read from precomputed collection + cron recompute |
-| `leaderboard-cron.service.ts` | `setInterval` every 15 min, calls `generateAndStoreLeaderboardData()` |
-| `leaderboard.routes.ts` | All routes gated by `Auth(admin, backOffice)` — no public access today |
-| `leaderboard.controller.ts` | Thin controllers wiring service → HTTP |
-
-### Current Auth Gate
-
-All existing leaderboard API routes (`GET /leaderboard`, `/leaderboard/weekly`, `/leaderboard/stats`) require `admin` or `back-office` role via `Auth(userRole.admin, userRole.backOffice)` middleware. There is no `user`-role or unauthenticated path today.
-
-### Dashboard (pft-dashboard)
-
-Admin leaderboard lives at `/(dashboard)/admin/leaderboard/`. The `(dashboard)` group enforces auth via `middleware.ts`: any path not in `isPublicPath` or `isAuthPath` redirects to `/auth/login` if cookies are missing.
-
-Public paths today are: `/auth/*`, `/checkout/*`, `/payment-*`, `/changelog`, `/kyc/verify`, `/free-trial`, `/c/:slug`, `/pap/:slug`. The `/leaderboard` path does not appear in this list — it would fall under protected-by-default.
+**Domain:** S2S conversion postback — partner click-ID capture, persistence, and GET postback firing via existing tracking infrastructure
+**Researched:** 2026-07-01
+**Confidence:** HIGH — based on direct code reads of all named files
 
 ---
 
-## Recommended Architecture
+## Existing Tracking Infrastructure (Verified)
 
-### Component Boundaries
+### Dispatch Framework
 
-| Component | New vs Modified | Responsibility | Communicates With |
-|-----------|----------------|---------------|-------------------|
-| `Competition` model | **NEW** | Stores competition definitions (dates, metric, prizes, status) | `CompetitionEntry`, admin APIs |
-| `CompetitionEntry` model | **NEW** | Snapshot of a trader's performance at competition end (or live snapshot for active) | `Competition`, `Leaderboard` |
-| `leaderboard.routes.ts` | **MODIFIED** | Add public read endpoint with data masking; add opt-out endpoint for authenticated users | `LeaderboardService` |
-| `competition.routes.ts` | **NEW** | Admin CRUD for competitions; public GET active competitions; admin trigger winner determination | `CompetitionService` |
-| `competition.service.ts` | **NEW** | State machine transitions, winner determination, snapshot logic | `Leaderboard`, `CompetitionEntry`, `User` |
-| `competition.cron.ts` | **NEW** | Scheduled auto-transition: `draft→active` at startDate, `active→ended` at endDate | `CompetitionService` |
-| User model (`auth.model.ts`) | **MODIFIED** | Add `leaderboardOptOut: Boolean` field | Leaderboard read path |
-| Public dashboard route | **NEW** | `/leaderboard` (outside `(dashboard)`) or new route group `(public)` | Public leaderboard API |
-| Admin competition UI | **NEW** | CRUD form, status badge, winner display under `/admin/competitions/` | Competition API |
-| Public leaderboard UI | **NEW** | Masked/unmasked display based on auth state | Public + authenticated leaderboard API |
+```
+Business event (e.g. registration / payment complete)
+         |
+         v
+TrackingEvents.signupCompleted() / .purchaseCompleted()
+  [ tracking.events.service.ts:38 / :61 ]
+         |
+         v
+dispatch(payload, { req }) — tracking.service.ts:150
+         |
+   enrichClickIds()         enrichUserData()      enrichRequestContext()
+   [enrichment/click-ids.ts:10]  [user-data.ts]     [request-context.ts]
+         |
+         v
+   destinationAcceptsEvent() per destination  [tracking.service.ts:66]
+         |
+    +----+------------------------------------------+
+    |  conversionWebhook adapter                    |
+    |  [destinations/conversion-webhook.ts:34]      |
+    |  EVENT_NAME_MAP (lines 19-25):                |
+    |    phase_passed      -> ChallengePassed        |
+    |    account_breached  -> ChallengeFailed        |
+    |    payout_completed  -> PayoutCompleted        |
+    |    kyc_verified      -> KYCCompleted           |
+    |    account_funded    -> AccountFunded          |
+    |  NOTE: signup_completed and                   |
+    |  purchase_completed are NOT in this map       |
+    |  -> adapter returns "skipped" for both        |
+    +-----------------------------------------------+
+         |
+         v
+ConversionWebhookService.deliverPayload()
+  [Admin/ConversionWebhook/conversion-webhook.service.ts:113]
+  POST JSON to webhookUrl with HMAC signature header
+```
+
+### Key Config Location
+
+`TrackingSettings` collection (`tracking_settings`) — one active doc per environment (production / staging / development). Destination sub-doc at `destinations.conversionWebhook` holds `{ enabled, webhookUrl, webhookSecret }` — from `tracking.model.ts:74-80` and `tracking.interface.ts:116-119`. This is the per-brand config location (per-DB isolation, no brandId field needed).
+
+### Current Click-ID Enrichment
+
+`enrichClickIds` (`enrichment/click-ids.ts:10-40`) reads: Meta `_fbc`/`_fbp`, `gclid`, `ttclid`, `msclkid`, `li_fat_id` — from request cookies and query string, merged onto the payload. There is no `partnerClickId` / `aff_click_id` / generic partner param. This file must be extended.
 
 ---
 
-## Data Models
+## Critical Gap: signup_completed and purchase_completed Are Not Wired
 
-### Competition Model
+**Finding (HIGH confidence):** `TrackingEvents.signupCompleted()` is defined at `tracking.events.service.ts:38` but is never called anywhere in the codebase. Same for `TrackingEvents.purchaseCompleted()` at line 61.
 
+- Registration completion fires `FacebookPixelService.trackStandardEvent("CompleteRegistration", ...)` at `auth.service.ts:1021` — a direct legacy path that bypasses the tracking dispatcher entirely.
+- Purchase completion fires `emitPurchaseCompletedWebhook(payment)` at `payment.service.modular.ts:1499` (free/coupon path) and the post-save hook fires Prometheus metrics only (`payment.model.ts:337`). The `emitPurchaseCompletedWebhook` helper calls `SalesWebhookDispatcher.purchaseCompleted()` — which routes to the SalesWebhook system (a separate webhook-config collection), not the tracking dispatch system.
+- The Tracking dispatcher's `purchase_completed` event has no call site and the `conversionWebhook` adapter has no mapping for it.
+- `tracking.constants.ts:29,40` shows `conversionWebhook: true` for both events — meaning the dispatcher will route them to the adapter, which immediately returns "skipped" because neither event is in `EVENT_NAME_MAP`.
+
+**Consequence:** Both `signup_completed` and `purchase_completed` must be wired as new call sites as part of this milestone before the postback can fire.
+
+---
+
+## Integration Design
+
+### 1. Where the Partner Click ID Is Captured and Persisted
+
+**Decision: Store `partnerClickId` on the User document, captured at registration via a body field forwarded from the frontend cookie.**
+
+Rationale:
+- The User document (`auth.model.ts:186`) is the natural per-user persistent record, already available at every downstream event emit site by userId lookup.
+- The click-to-registration gap is the hardest: the user is anonymous at click time and has an identity only after OTP verification completes (`auth.service.ts:820-953`). A cookie (set on the frontend on landing, forwarded as a body field at signup) is the reliable bridge — no server-side session exists between anonymous click and account creation.
+- The click-to-purchase gap is trivially solved: `userId` is known at payment time; look up `user.partnerClickId`.
+- `partnerClickId` is written once at registration and read at every subsequent event. It never changes. This satisfies "survives click to registration to purchase."
+
+**Capture flow:**
+1. Frontend landing page receives `?clickid=<value>` (or partner param name `?aff_click_id=` etc.) from the partner redirect URL.
+2. Frontend stores the raw value in a first-party cookie (e.g. `_partner_clickid`, 30-day expiry, same pattern as `_fbc`/`_gclid`).
+3. At registration, the frontend reads the cookie and forwards it as `req.body.partnerClickId`.
+4. `TRegisterUser` interface (`auth.interface.ts:320`) gains `partnerClickId?: string`.
+5. `UserSchema` (`auth.model.ts:186`) gains `partnerClickId: { type: String, index: true }`.
+6. `AuthService.verifyRegistrationOtp` (`auth.service.ts:820`) writes the field to the user document in the `User.findByIdAndUpdate` call at line 830.
+
+**Alternative rejected:** A separate `PartnerClick` collection keyed by session token adds a lookup hop and requires a token threaded through the OTP flow — over-engineered for a one-partner MVP.
+
+### 2. How the Click ID Reaches the Emit Points
+
+**signup_completed:** Add `TrackingEvents.signupCompleted({ userId, email, partnerClickId: registeredUser.partnerClickId })` in the post-OTP block of `auth.service.ts` around line 1020 (after the existing `FacebookPixelService.trackStandardEvent` call). Pass `null` for req — `auth.controller.ts` does not propagate req into the service layer, and the partnerClickId is already on the user doc, not the live request.
+
+**purchase_completed (paid path):** Gateway callbacks (`callback.service.ts`) and Stripe webhooks (`stripe-webhook.service.ts`) do not currently call any `TrackingEvents` for the purchase event. A shared utility — mirroring `emitPurchaseCompletedWebhook` (`payment/utils/salesWebhookEmit.ts:36`) but targeting the tracking system — should be added. It receives the payment doc, does a lightweight `User.findById(payment.userId).select("partnerClickId")`, then calls `TrackingEvents.purchaseCompleted({ ..., partnerClickId })`. This utility is called from all paid-completion paths.
+
+**purchase_completed (free/coupon path):** Called at `payment.service.modular.ts:1499` alongside `emitPurchaseCompletedWebhook`. Add the new tracking utility call there.
+
+**`enrichClickIds` extension (`enrichment/click-ids.ts:10`):** Add reading `_partner_clickid` cookie as a fallback for `payload.partnerClickId`. This handles the case where a request object is available (browser-side events); for server-side-only paths the value comes from the user doc, not the cookie.
+
+### 3. How the S2S GET Postback Is Fired
+
+**Decision: Add a new sibling `partnerPostback` destination adapter. Do NOT modify the existing `conversionWebhook` adapter.**
+
+Rationale for a new adapter:
+- The existing `conversionWebhookAdapter` (`destinations/conversion-webhook.ts`) is a POST JSON adapter with HMAC signing. S2S postbacks for CPA networks are GET requests with URL macro substitution (e.g. `https://partner.net/postback?clickid={clickid}&amount={amount}`). These are different transport contracts.
+- Adding a GET branch to the existing adapter would put a mode-switch into an adapter that already has a live partner integration, risking silent breaks to existing POST delivery logs and the HMAC signing codepath.
+- A new `partnerPostback` adapter registered in `destinations/index.ts:14` alongside `conversionWebhookAdapter` is isolated, testable, and follows the established `IDestinationAdapter` contract (`destinations/base.ts:27`).
+
+**Adapter behavior (`destinations/partner-postback.ts`):**
+- `send(payload, ctx)` reads `ctx.settings.destinations.partnerPostback.postbackUrlTemplate`.
+- Returns `{ status: "skipped" }` if template is empty or `payload.partnerClickId` is absent.
+- Substitutes macros `{clickid}`, `{event}`, `{amount}`, `{currency}`, `{userid}`, `{orderid}` with values from payload.
+- Issues an outbound HTTP GET. No body. 15-second timeout.
+- Returns `{ status: "sent", responseMeta: { httpStatus } }` on 2xx, `{ status: "failed" }` otherwise.
+
+### 4. Where the Partner's Postback URL Template Lives
+
+**Decision: Add `partnerPostback` as a new destination sub-document in `TrackingSettings`.**
+
+Rationale:
+- `TrackingSettings` (`tracking.model.ts:109`) is the per-brand (per-DB) config store for all destinations. Adding a `partnerPostback` destination sub-doc is the minimum-schema-change path.
+- The admin configures and enables/disables it via the existing `PUT /api/tracking/settings` endpoint — no new admin routes.
+- Per-brand: the Trading Cult DB gets the Trading Cult partner URL; other brands leave it empty and the adapter skips.
+- Avoids env vars (not per-brand) and a separate config collection (over-engineered for minimal scope).
+
+**Minimum config shape added to `tracking.interface.ts:116` area:**
 ```typescript
-interface ICompetition {
-  name: string;
-  description?: string;
-  startDate: Date;
-  endDate: Date;
-  metric: "valueGrowthPercentage" | "totalProfit" | "winRate" | "profitFactor";
-  status: "draft" | "active" | "ended" | "archived";
-  prizePool: Array<{
-    rank: number;          // 1, 2, 3, etc.
-    label: string;         // "1st Place"
-    amount: number;
-    currency: string;      // "USD"
-    description?: string;  // "Cash prize" / "Account credit"
-  }>;
-  winners?: Array<{
-    rank: number;
-    userId: ObjectId;
-    mt5AccountId: string;
-    metricValue: number;
-    prizeAmount: number;
-    determinedAt: Date;
-  }>;
-  eligibilityCriteria?: {
-    minTrades?: number;
-    minTradingDays?: number;
-    accountTypes?: string[];   // funded, challenge, etc.
-  };
-  createdBy: ObjectId;         // admin userId
-  createdAt: Date;
-  updatedAt: Date;
+interface IPartnerPostbackConfig extends IDestinationToggle {
+  postbackUrlTemplate: string; // e.g. "https://partner.net/postback?clickid={clickid}&event={event}&amount={amount}"
 }
 ```
 
-Indexes: `{ status: 1 }`, `{ startDate: 1, endDate: 1 }`, `{ status: 1, endDate: 1 }`.
-
-### CompetitionEntry Model
-
-```typescript
-interface ICompetitionEntry {
-  competitionId: ObjectId;
-  userId: ObjectId;
-  mt5AccountId: string;
-  programId: ObjectId;
-  snapshotMetric: number;      // value of the competition metric at snapshot time
-  snapshotPerformance: {       // full performance snapshot (copy from Leaderboard doc)
-    valueGrowthPercentage: number;
-    totalProfit: number;
-    winRate: number;
-    profitFactor: number;
-    tradingDays: number;
-  };
-  rank?: number;               // assigned after winner determination
-  snapshotAt: Date;
-  isWinner: boolean;
-  createdAt: Date;
-}
-```
-
-Indexes: `{ competitionId: 1, userId: 1 }`, `{ competitionId: 1, snapshotMetric: -1 }`, `{ competitionId: 1, rank: 1 }`.
-
-**Do not embed entries inside the Competition document** — competitions with 10k+ eligible participants would blow the 16MB BSON document limit.
-
-### User Model Change
-
-Add one field to the existing User schema:
-
-```typescript
-leaderboardOptOut: { type: Boolean, default: false }
-```
-
-This is the simplest approach. A separate collection adds unnecessary joins for a single boolean. Filter `leaderboardOptOut: { $ne: true }` in the public leaderboard query path only (admin view still sees everyone).
+Event toggles via `IDestinationToggle.events` map — default `signup_completed: true`, `purchase_completed: true`, all others false.
 
 ---
 
-## API Routes
+## New vs. Modified Components
 
-### New Public Endpoint (pft-backend)
+### New Components
 
-```
-GET /leaderboard/public
-```
+| File | What | Why New |
+|------|------|---------|
+| `pft-backend/src/app/modules/Tracking/destinations/partner-postback.ts` | GET postback adapter with macro substitution | Different transport contract from existing POST adapter |
+| `pft-backend/src/app/modules/Payment/utils/trackingPurchaseEmit.ts` | Utility to fire TrackingEvents.purchaseCompleted with partnerClickId lookup | Mirrors salesWebhookEmit pattern; keeps emit sites DRY |
 
-- **Auth:** None required. Uses existing `cacheResponse(45)` middleware.
-- **Data masking logic:** The service layer checks if the request has a valid JWT (`req.user`). If yes (authenticated user or admin), return full name + email. If no auth token, mask: `firstName = "A***"`, `lastName = "***"`, email omitted.
-- **Filters:** Same as existing `getLeaderboard` minus admin-only fields.
-- **Opt-out:** Exclude users where `leaderboardOptOut: true` from results.
+### Modified Components
 
-Why a separate `/public` route rather than modifying the existing `/` route: the existing route is consumed by the admin panel and returns full PII. Keeping them separate avoids inadvertent data masking regressions in the admin view.
-
-### Competition Endpoints (pft-backend)
-
-```
-POST   /competitions                          Auth(admin)
-GET    /competitions                          Public (list active/ended only; draft hidden)
-GET    /competitions/:id                      Public (if active/ended/archived)
-PATCH  /competitions/:id                      Auth(admin) — update meta or status
-DELETE /competitions/:id                      Auth(admin) — soft delete / archive
-POST   /competitions/:id/determine-winners    Auth(admin) — on-demand trigger
-GET    /competitions/:id/entries              Auth(admin) — paginated entries
-```
-
-### User Opt-Out Endpoint (pft-backend)
-
-```
-PATCH /users/me/leaderboard-opt-out    Auth(user)   body: { optOut: boolean }
-```
-
-Piggybacks on the existing User module — no new module needed.
-
----
-
-## Competition State Machine
-
-```
-draft ──────────────────────────────────────────► archived
-  │                                                  ▲
-  │  (startDate reached, via cron or manual)         │
-  ▼                                                  │
-active ──(endDate reached, via cron or manual)──► ended ─(admin archives)─►
-```
-
-Transitions:
-
-| From | To | Trigger | Side Effect |
-|------|----|---------|-------------|
-| `draft` | `active` | `startDate <= now` (cron) or admin manual | None |
-| `active` | `ended` | `endDate <= now` (cron) or admin manual | Trigger winner determination |
-| `ended` | `archived` | Admin manual only | None |
-| `draft` | `archived` | Admin manual (cancel) | None |
-
-**No `active → draft` rollback.** Once active, the competition is visible to the public and participants have expectations. Only forward transitions are allowed.
-
----
-
-## Winner Determination
-
-**Approach: on-demand with cron fallback.** When status transitions `active → ended`, the `CompetitionService.determineWinners(competitionId)` method runs. This same method is also callable by admin via `POST /competitions/:id/determine-winners` at any time after `ended`.
-
-Why not a pure cron: a standalone "determine winners" cron would run on a schedule that may not align with competition end times. The transition hook is more deterministic. The admin on-demand trigger exists as a safety valve if the cron missed or the admin wants to re-run after data corrections.
-
-**Determination algorithm:**
-
-```
-1. Query Leaderboard collection for all active entries where:
-   - userId NOT in leaderboardOptOut=true
-   - Meets competition.eligibilityCriteria (minTrades, minTradingDays)
-   - programId NOT a free trial
-2. Sort by competition.metric descending
-3. Deduplicate by userId (take best-performing account per user)
-4. Take top N (N = prizePool.length)
-5. Bulk-insert CompetitionEntry documents with rank + isWinner=true
-6. Insert remaining entries with isWinner=false (for audit/display)
-7. Set competition.winners[] array and competition.status = "ended" (if not already)
-8. (Optional future: trigger notification to winners)
-```
-
-**Idempotency:** Before inserting, delete any existing `CompetitionEntry` docs for this `competitionId` where `snapshotAt` matches the current run. This makes re-runs safe.
-
----
-
-## Public Dashboard Route (pft-dashboard)
-
-### Route Group Strategy
-
-Add a new route group `(public)` alongside the existing `(dashboard)` group:
-
-```
-src/app/
-  (dashboard)/          ← requires auth cookies (existing)
-  (public)/             ← no auth required (new)
-    leaderboard/
-      page.tsx          ← public leaderboard
-      layout.tsx
-    competitions/
-      page.tsx          ← list active competitions
-      [id]/
-        page.tsx        ← competition detail + live rankings
-```
-
-The `(public)` group gets its own `layout.tsx` with brand header/footer but no auth guard. It does not go inside `(dashboard)` because the middleware redirects any non-public path without cookies to `/auth/login`.
-
-**Add to `middleware.ts` `isPublicPath` check:**
-
-```typescript
-const isLeaderboardPath = path.startsWith("/leaderboard");
-const isCompetitionsPath = path.startsWith("/competitions");
-const isPublicPath =
-  isAuthPath || isCheckoutPath || ... ||
-  isLeaderboardPath ||
-  isCompetitionsPath;
-```
-
-### Auth-Aware Data Masking in UI
-
-The public leaderboard page uses `getServerSession` or reads the `accessToken` cookie server-side. If the cookie is present, pass an `Authorization` header to the backend public endpoint — the backend then returns unmasked data. If no cookie, no header — backend returns masked data. This keeps masking logic in one place (backend) and avoids a separate "masked" API.
+| File | Location | Change |
+|------|----------|--------|
+| `auth.interface.ts` | TRegisterUser at line 320 | Add `partnerClickId?: string` |
+| `auth.model.ts` | UserSchema around line 479 | Add `partnerClickId: { type: String, index: true }` |
+| `auth.service.ts` | verifyRegistrationOtp: findByIdAndUpdate at line 830 | Pass `partnerClickId` into the user update |
+| `auth.service.ts` | Post-registration block after line 1020 | Add `TrackingEvents.signupCompleted({ userId, email, partnerClickId })` |
+| `tracking.interface.ts` | DESTINATIONS const at line 51 | Add `"partnerPostback"` |
+| `tracking.interface.ts` | destinations map at line 142 | Add `partnerPostback: IPartnerPostbackConfig` |
+| `tracking.interface.ts` | ITrackingEventPayload at line 168 | Add `partnerClickId?: string` |
+| `tracking.constants.ts` | DEFAULT_EVENT_TOGGLES at line 23 | Add `partnerPostback` column with `signup_completed: true`, `purchase_completed: true`, all others false |
+| `tracking.model.ts` | Around line 74 (destination sub-schemas) | Add `PartnerPostbackConfigSchema` and wire into `destinations` sub-doc |
+| `destinations/index.ts` | registerAllAdapters at line 14 | Add `registerAdapter(partnerPostbackAdapter)` |
+| `enrichment/click-ids.ts` | enrichClickIds at line 10 | Read `_partner_clickid` cookie fallback; pass through `payload.partnerClickId` |
+| `payment.service.modular.ts` | Around line 1499 | Add call to `emitTrackingPurchaseCompleted(payment)` |
+| `payment/services/callback.service.ts` | Payment completion site around line 395 | Add call to `emitTrackingPurchaseCompleted(payment)` |
+| `payment/services/stripe-webhook.service.ts` | PAP payment completion around line 507 | Add call to `emitTrackingPurchaseCompleted(payment)` if applicable |
 
 ---
 
 ## Data Flow
 
+### Click to Registration to Postback
+
 ```
-Cron (every 15 min)
-  └─► LeaderboardService.generateAndStoreLeaderboardData()
-        └─► Leaderboard collection (upsert per userId+programId)
+Partner ad click -> frontend landing page (?clickid=ABC123)
+  |
+  Set cookie: _partner_clickid=ABC123 (30-day, first-party)
+  |
+  User fills signup form
+  POST /api/auth/register
+  body: { ...fields, partnerClickId: "ABC123" }  <- read from cookie by frontend JS
+  |
+  AuthService.initiateRegistration() stores partnerClickId on temp (unregistered) user doc
+  (OTP email sent)
+  |
+  POST /api/auth/register/verify-otp
+  AuthService.verifyRegistrationOtp() [auth.service.ts:820]
+    -> User.findByIdAndUpdate(..., { partnerClickId: "ABC123", isRegistered: true, ... })
+                                                               [line ~830]
+  |
+  TrackingEvents.signupCompleted({ userId, email, partnerClickId: "ABC123" })
+  [auth.service.ts ~1020 -- NEW CALL SITE]
+  |
+  dispatch(payload) -> partnerPostback adapter
+    payload.partnerClickId = "ABC123"
+    resolves template: https://partner.net/postback?clickid=ABC123&event=signup_completed
+    HTTP GET (fire-and-forget)
+    -> 200 OK -> status: "sent"
+```
 
-Competition Cron (every 5 min — lightweight state check only)
-  └─► CompetitionService.tickTransitions()
-        └─► Competition.find({ status: "draft", startDate: { $lte: now } })
-              └─► transition to "active"
-        └─► Competition.find({ status: "active", endDate: { $lte: now } })
-              └─► transition to "ended"
-              └─► CompetitionService.determineWinners()
+### Purchase to Postback
 
-Public API GET /leaderboard/public
-  └─► reads Leaderboard collection (with optOut exclusion + data masking)
-
-Admin API GET /competitions/:id/entries
-  └─► reads CompetitionEntry collection (indexed on competitionId)
-
-Admin trigger POST /competitions/:id/determine-winners
-  └─► CompetitionService.determineWinners()
-        └─► reads Leaderboard collection
-        └─► writes CompetitionEntry collection
-        └─► updates Competition.winners[]
+```
+Payment gateway callback / Stripe webhook
+  -> callback.service.ts: payment.status = "completed" (~line 395)
+  |
+  emitTrackingPurchaseCompleted(payment)  [NEW utility]
+    -> User.findById(payment.userId).select("partnerClickId")
+    -> TrackingEvents.purchaseCompleted({ userId, value, currency, partnerClickId })
+  |
+  dispatch(payload) -> partnerPostback adapter
+    resolves template: https://partner.net/postback?clickid=ABC123&event=purchase_completed&amount=99
+    HTTP GET
 ```
 
 ---
 
-## Build Order (Dependency-First)
+## Dependency-Ordered Build Sequence
 
-1. **Backend: User model opt-out field** — unblocks all opt-out logic downstream; one-line schema change + migration-safe (default false)
-2. **Backend: Public leaderboard endpoint** — `GET /leaderboard/public` with masking. Unblocks public UI work. Can reuse 100% of existing `LeaderboardService.getLeaderboard()` with an `isPublic` flag.
-3. **Backend: Competition + CompetitionEntry models** — no service logic yet; just the schemas. Lets frontend types be generated.
-4. **Backend: CompetitionService + competition.routes.ts** — CRUD + state machine + winner determination.
-5. **Backend: Competition cron** — register alongside existing `LeaderboardCronService.startCronJob()` in app bootstrap.
-6. **Frontend: middleware.ts public path additions** — unblocks all public page work.
-7. **Frontend: `(public)` route group + public leaderboard page** — wire to `GET /leaderboard/public`.
-8. **Frontend: Admin competitions UI** — `/(dashboard)/admin/competitions/` CRUD + winner display.
-9. **Frontend: Public competitions pages** — `/competitions/` list + `/competitions/[id]/` detail.
+**Phase A: Click ID capture and persistence** (must be first — nothing can fire without the stored ID)
+1. Add `partnerClickId` to `TRegisterUser` interface and `UserSchema`.
+2. Write `partnerClickId` in `verifyRegistrationOtp` at the findByIdAndUpdate call.
+3. Pass `partnerClickId` through `initiateRegistration` (the two-step OTP path stores it on the pre-verified user doc so it's available at OTP completion).
+4. Frontend: set `_partner_clickid` cookie on landing; forward in signup body (parallel frontend work).
+5. Verification: manual test registration with `partnerClickId` in body; confirm field on user doc.
 
----
+**Phase B: Wire the emit points** (depends on Phase A — the stored value must exist before emitting)
+6. Add `partnerClickId?: string` to `ITrackingEventPayload`.
+7. Extend `enrichClickIds` with cookie fallback.
+8. Add `TrackingEvents.signupCompleted()` call in `auth.service.ts:1020` block.
+9. Implement `trackingPurchaseEmit.ts` utility (DB lookup + TrackingEvents.purchaseCompleted call).
+10. Add utility call to `payment.service.modular.ts:1499` (free path) and `callback.service.ts` / `stripe-webhook.service.ts` (paid paths).
 
-## Modified vs New — Explicit List
+**Phase C: New adapter and config** (depends on Phase B for integration tests that exercise end-to-end flow)
+11. Add `"partnerPostback"` to DESTINATIONS, interface shape, constants table, and model schema.
+12. Implement `partner-postback.ts` adapter (GET, macro substitution, skip if no clickid or no template).
+13. Register adapter in `destinations/index.ts`.
+14. Configure `postbackUrlTemplate` in TrackingSettings for Trading Cult's brand DB.
 
-### Modified (pft-backend)
-
-| File | Change |
-|------|--------|
-| `modules/Auth/auth.model.ts` | Add `leaderboardOptOut: Boolean` field |
-| `modules/Leaderboard/leaderboard.routes.ts` | Add `GET /public` route (no auth middleware) |
-| `modules/Leaderboard/leaderboard.service.ts` | Add `getPublicLeaderboard(query, isAuthenticated)` method with opt-out filter + masking |
-| `app.ts` or bootstrap file | Register `CompetitionCronService.start()` alongside existing leaderboard cron |
-
-### New (pft-backend)
-
-| File | Purpose |
-|------|---------|
-| `modules/Competition/competition.model.ts` | Competition schema |
-| `modules/Competition/competitionEntry.model.ts` | CompetitionEntry schema |
-| `modules/Competition/competition.interface.ts` | TypeScript interfaces |
-| `modules/Competition/competition.service.ts` | State machine + winner determination |
-| `modules/Competition/competition.controller.ts` | HTTP handlers |
-| `modules/Competition/competition.routes.ts` | Route definitions |
-| `modules/Competition/competition.cron.ts` | Lightweight transition ticker |
-
-### Modified (pft-dashboard)
-
-| File | Change |
-|------|--------|
-| `src/middleware.ts` | Add `isLeaderboardPath` and `isCompetitionsPath` to `isPublicPath` |
-| `src/app/(dashboard)/admin/` | Add `competitions/` page folder |
-
-### New (pft-dashboard)
-
-| File | Purpose |
-|------|---------|
-| `src/app/(public)/layout.tsx` | Public layout (no auth, brand header/footer) |
-| `src/app/(public)/leaderboard/page.tsx` | Public leaderboard with auth-aware masking |
-| `src/app/(public)/leaderboard/layout.tsx` | Metadata |
-| `src/app/(public)/competitions/page.tsx` | Active/past competitions list |
-| `src/app/(public)/competitions/[id]/page.tsx` | Competition detail + live rankings |
-| `src/app/(dashboard)/admin/competitions/page.tsx` | Admin competition management |
-| `src/app/(dashboard)/_components/modules/admin/competitions/` | Admin UI components |
-| `src/app/(public)/_components/leaderboard/` | Public leaderboard components (reuse admin components where possible) |
+**Phase D: End-to-end verification**
+15. Test signup with `?clickid=TEST123` -> confirm User doc field, confirm GET fires with clickid in URL.
+16. Test paid purchase -> confirm GET fires with amount macro resolved.
+17. Confirm existing `conversionWebhook` POST deliveries are unaffected.
+18. Confirm `conversionWebhook` still returns "skipped" for signup/purchase events (not "failed").
 
 ---
 
-## Reuse Opportunities
+## Anti-Patterns to Avoid
 
-The admin leaderboard already has `LeaderboardTable`, `LeaderboardSearchAndSort`, `LeaderboardStats`, `LeaderboardPagination` components. The public leaderboard page should reuse these components directly, passing a `masked` prop that controls whether name/email is rendered in full or truncated. Do not duplicate these components — extend them.
+### Anti-Pattern 1: Reading the Click ID Only from the Request Cookie at Fire Time
 
----
+**What people do:** Skip persisting to User doc; instead read `_partner_clickid` cookie off the request at dispatch time via `enrichClickIds`.
 
-## Scalability Considerations
+**Why it's wrong:** `purchase_completed` fires from gateway webhook callbacks (`callback.service.ts`) and potentially cron-adjacent provisioning paths that have no request object. `req` is `null` at those sites. `enrichClickIds` at `click-ids.ts:14` explicitly guards `(req?.cookies as ...) || {}` — produces nothing without a request. The clickid is silently lost and no postback fires.
 
-| Concern | Now | At scale |
-|---------|-----|----------|
-| Public leaderboard reads | `cacheResponse(45)` on backend is sufficient | Add CDN edge caching header if traffic spikes |
-| CompetitionEntry inserts at `ended` | Bulk insert once per competition — fine | No concern; not a write-hot path |
-| Winner determination query | Reads full `Leaderboard` collection — fine at current scale | Add `{ leaderboardOptOut: 1 }` index on User if filter becomes slow |
-| Competition cron overhead | Lightweight — one `find` per status per tick | Run less frequently (every 10 min) if many competitions exist |
+**Do this instead:** Persist to User doc at registration. Fetch from DB at purchase emit time.
+
+### Anti-Pattern 2: Adding a GET Mode to the Existing conversionWebhook Adapter
+
+**What people do:** Add a `method: "GET"` branch and `postbackUrlTemplate` field to `conversion-webhook.ts`.
+
+**Why it's wrong:** The adapter already has a live POST integration with HMAC signing. Adding a GET branch creates a mode-switch, complicates the `deliverPayload` / `signBody` codepath, and conflates two different downstream contracts. A delivery log failure for one partner could shadow the other.
+
+**Do this instead:** New `partnerPostback` adapter as a separate destination.
+
+### Anti-Pattern 3: Wiring purchase_completed Only from the Free-Payment Path
+
+**What people do:** Add the TrackingEvents call only at `payment.service.modular.ts:1499`.
+
+**Why it's wrong:** That block is the free (zero-amount, 100%-coupon) path only. Real paid completions flow through `callback.service.ts` (all payment gateways) and `stripe-webhook.service.ts` (Stripe PAP). Those paths do not call `payment.service.modular.ts:1499`.
+
+**Do this instead:** A shared utility called from all three completion sites.
+
+### Anti-Pattern 4: Using `conversionWebhookAdapter` EVENT_NAME_MAP for signup/purchase
+
+**What people do:** Add `signup_completed: "SignupCompleted"` and `purchase_completed: "PurchaseCompleted"` to the existing `EVENT_NAME_MAP` in `conversion-webhook.ts:19-25`.
+
+**Why it's wrong:** That adapter sends POST JSON to the existing ConversionWebhook partner URL (which already has a live contract). Injecting new events into that POST stream changes the partner's event set without their agreement and bypasses the GET/macro transport the new partner requires.
+
+**Do this instead:** The new `partnerPostback` adapter handles these events independently.
 
 ---
 
 ## Sources
 
-- Direct codebase inspection: `pft-backend/src/app/modules/Leaderboard/` (all files)
-- Direct codebase inspection: `pft-dashboard/src/app/(dashboard)/admin/leaderboard/`
-- Direct codebase inspection: `pft-dashboard/src/middleware.ts` lines 430–483
-- Direct codebase inspection: `pft-backend/src/app/modules/Auth/auth.utils.ts` (role enum)
-- Confidence: HIGH — based on direct source inspection, not training data assumptions
+- `pft-backend/src/app/modules/Tracking/tracking.service.ts` (dispatch framework — direct read)
+- `pft-backend/src/app/modules/Tracking/destinations/index.ts` (adapter registry — direct read)
+- `pft-backend/src/app/modules/Tracking/destinations/base.ts` (adapter contract — direct read)
+- `pft-backend/src/app/modules/Tracking/destinations/conversion-webhook.ts` (POST adapter, EVENT_NAME_MAP — direct read)
+- `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.service.ts` (direct read)
+- `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.interface.ts` (direct read)
+- `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.model.ts` (direct read)
+- `pft-backend/src/app/modules/Tracking/tracking.constants.ts` (event toggles — direct read)
+- `pft-backend/src/app/modules/Tracking/enrichment/click-ids.ts` (direct read)
+- `pft-backend/src/app/modules/Tracking/tracking.interface.ts` (payload + config shapes — direct read)
+- `pft-backend/src/app/modules/Tracking/tracking.events.service.ts` (call sites confirmed absent — direct read)
+- `pft-backend/src/app/modules/Auth/auth.service.ts` (registration flow — direct read)
+- `pft-backend/src/app/modules/Auth/auth.model.ts` (UserSchema — direct read)
+- `pft-backend/src/app/modules/Auth/auth.interface.ts` (TRegisterUser — direct read)
+- `pft-backend/src/app/modules/Payment/payment.service.modular.ts` (free payment emit — direct read)
+- `pft-backend/src/app/modules/Payment/payment.model.ts` (post-save hook — direct read)
+- `pft-backend/src/app/modules/Payment/services/callback.service.ts` (paid completion — direct read)
+- `pft-backend/src/app/modules/Payment/utils/salesWebhookEmit.ts` (pattern reference — direct read)
+- `pft-backend/src/app/modules/SalesWebhook/salesWebhook.dispatch.ts` (confirmed separate system — direct read)
+- `pft-backend/src/app/modules/Affiliate/clickEvent.model.ts` (confirmed not applicable — direct read)
+
+---
+*Architecture research for: CRM Partner S2S Postback (v1.3)*
+*Researched: 2026-07-01*

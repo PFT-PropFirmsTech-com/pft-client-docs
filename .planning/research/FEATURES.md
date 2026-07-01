@@ -1,212 +1,217 @@
 # Feature Research
 
-**Domain:** Public leaderboard + monthly competition system for prop trading platforms
-**Researched:** 2026-06-28
-**Confidence:** MEDIUM (industry patterns HIGH confidence; specific competitor UI details MEDIUM — direct scraping blocked, validated via multiple secondary sources)
+**Domain:** CRM Partner S2S Postback Tracking (v1.3 — Trading Cult one-off)
+**Researched:** 2026-07-01
+**Confidence:** HIGH (grounded in file-level code reading; no web research needed for existing-system claims)
 
 ---
 
-## Context: What's Already Built
+## How S2S Postbacks Work (Context for Requirements Author)
 
-The following exist and must NOT be rebuilt — only extended:
+A CPA/affiliate network partner sends traffic to your site with a click ID in the URL. You store that click ID server-side, tied to a visitor session and ultimately to a user account. When a conversion event occurs (registration, purchase), your backend fires a GET or POST to the partner's postback URL with the original click ID and any payout data. The partner reconciles their click log and attributes the conversion. The invariant the partner enforces is that **the click ID sent in the postback must exactly match what was in the original tracking link** — any transformation or substitution breaks attribution on their side.
 
-- `LeaderboardTable`, `LeaderboardStats`, `LeaderboardPagination`, `LeaderboardSearchAndSort`, `LeaderboardViewToggle`, `WeeklyPrizeWinners` components (admin-only)
-- `LeaderboardHeader`, `LeaderboardContainer` (admin shell)
-- Backend: precomputed `Leaderboard` collection, cron refresh, routes at `/leaderboard` (admin/backOffice auth only)
-- Data model: rank, globalRank, profitPercentage, valueGrowthPercentage, winRate, profitFactor, totalProfit, maxDrawdown, tradingDays, accountAge per MT5 account
-
-New work is: (1) public-facing version of leaderboard, (2) monthly competition system with admin creation, auto-enrollment, prize pool, opt-out.
+The Trading Cult partner contract:
+- **Tracking link:** `https://your-domain.com/track?clickid={clickid}`
+- **Store:** the raw `clickid` value, server-side
+- **Fire on registration:** `https://partner-domain.com/postback?clickid={stored}&goal=registration`
+- **Fire on conversion/sale:** `https://partner-domain.com/postback?clickid={stored}&goal=conversion&payout={amount}`
 
 ---
 
 ## Feature Landscape
 
-### Table Stakes (Users Expect These)
+### Table Stakes (Partner Contract Requires These)
 
-Features that every competing prop firm has. Missing = product looks unfinished.
+All items tagged with EXISTS / MODIFY / NEW and grounded in a specific file.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Public leaderboard page (no login required) | FXIFY, FTMO, FundingPips all have public-facing leaderboards; traders share links on social | LOW | Route `/leaderboard` must be accessible without auth; reuse existing LeaderboardTable component |
-| Anonymous display for non-logged-in visitors | Industry standard — show initials or "Trader #1234", never full name/email to unauthenticated users | LOW | Backend: strip firstName/lastName/email from public API response; show avatar initials only |
-| Full name visible after login | Traders want to know who they're competing against after they authenticate | LOW | Same API endpoint, auth token unlocks full name field |
-| Rank + profit % as primary displayed metric | Profit percentage is the universal ranking metric across FXIFY, FundingPips, FTMO, FundedNext | LOW | Already in data model as `valueGrowthPercentage`; already shown in LeaderboardTable |
-| Timeframe filter (monthly / all-time) | Competitions run monthly; traders expect to filter to see current month standings | MEDIUM | `LeaderboardFilters.timeframe` exists in interface but needs public-facing UI wiring |
-| Competition countdown timer | FundedNext, FundingPips both show prominent countdown to competition end; creates urgency | LOW | Frontend only — calculate from competition `endDate` |
-| Past winners / hall of fame | Industry standard; shows the firm pays out, builds social proof | MEDIUM | New collection or embedded in competition doc; reuse WeeklyPrizeWinners pattern |
-| Prize pool display | All prop firm competition pages lead with prize pool size prominently | LOW | Admin-configured field; display on competition hero section |
-| Trader opt-out from public leaderboard | Privacy expectation; some firms offer this; GDPR-relevant for EU traders | MEDIUM | User preference flag; if opted out, entry not returned in public API |
+| Feature | Why Required | Status | Complexity | Code Evidence |
+|---------|-------------|--------|------------|---------------|
+| **Tracking link endpoint** `GET /track?clickid=X` | Partner sends traffic here; must capture `clickid` before redirecting to site | NEW | LOW | No such route exists. New Express route: read `?clickid`, set a `partner_clickid` cookie (SameSite=Lax, Secure, max-age = attribution window), redirect to home/registration. No auth. |
+| **Click ID cookie persistence** | Browser must carry the click ID from landing page through to the registration form post | NEW | LOW | `enrichClickIds` (`enrichment/click-ids.ts:10`) already reads ad-platform click IDs from cookies/query. A `partner_clickid` cookie is not in that list — it is a separate thing served from the tracking link. |
+| **`partnerClickId` field on User document** | Click ID must survive from registration to purchase, which may happen days later; cannot rely on cookie | NEW | LOW | `ITrackingEventPayload` has ad-platform IDs (`fbc`, `gclid`, etc.) but no generic `partnerClickId` (`tracking.interface.ts:194-200`). The User model has no attribution storage at all (confirmed: no `attribution` field in User module). Must add `partnerClickId?: string` to User schema. |
+| **Click ID capture at registration** | At signup, read `partner_clickid` cookie from request and store in User document | NEW | LOW | `TrackingEvents.signupCompleted` helper exists (`tracking.events.service.ts:38`) and fires with `req?: Request`. The `req` carries cookies. Capture must happen at the registration callsite — but see critical gap below: `signupCompleted` has zero callers. |
+| **Registration postback** | Fire to partner URL when registration completes for a user with a stored `partnerClickId` | NEW + MODIFY | MEDIUM | `signup_completed` is default-on for `conversionWebhook` (`tracking.constants.ts:29`). **Critical gap:** `conversionWebhookAdapter` `EVENT_NAME_MAP` (`destinations/conversion-webhook.ts:19-25`) only maps `phase_passed`, `account_breached`, `payout_completed`, `kyc_verified`, `account_funded` — `signup_completed` returns `status: "skipped"` today (`conversion-webhook.ts:50-52`). Also: the existing adapter sends a POST JSON body, not a GET with query params (incompatible wire protocol — see Anti-Features). |
+| **Conversion postback with payout value** | Fire to partner URL when a qualifying purchase completes for a user with a `partnerClickId` | NEW | MEDIUM | `purchase_completed` is also absent from `EVENT_NAME_MAP` (`destinations/conversion-webhook.ts:19-25`). The `SalesWebhookDispatcher.purchaseCompleted` path (`salesWebhook.dispatch.ts:72`) fires on payment completion (`payment.service.modular.ts:1499`) but goes to SalesWebhook, not the partner URL. Neither existing path fires a partner postback. |
+| **Unchanged click ID guarantee** | Partner's attribution breaks if the click ID is transformed in any way | NEW — IMPLICIT | LOW | Store the raw URL-decoded value from `?clickid=`. No hash, no normalization, no truncation. Pass verbatim in postback query string. |
+| **Idempotency — one fire per event per user** | Re-delivery or race conditions must not double-fire the postback | NEW | LOW | Registration: dedup via `TrackingEventLog` exists (`dedup/dedup.service.ts:14`) keyed on `eventId`. Conversion: `SalesWebhookDispatcher.purchaseCompleted` already dedupes on `paymentId` (`salesWebhook.dispatch.ts:91`). The partner postback adapter must plug into one of these dedup paths (or add its own delivery log). |
 
-### Differentiators (Competitive Advantage)
+---
 
-Features beyond baseline that create engagement and retention.
+### Open Decisions That Requirements Must Pin Before Implementation Starts
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| "Your rank" highlighted when logged in | FundedNext does this — logged-in trader sees their own row highlighted/pinned | MEDIUM | Requires matching auth user to leaderboard entry by userId; scroll-to or pin at top |
-| Competition-specific leaderboard (separate from all-time) | FundingPips runs competitions on a dedicated portal; cleaner UX than mixing competition vs ongoing | MEDIUM | Competition has its own snapshot of participants + rankings; not the live precomputed leaderboard |
-| Multiple concurrent competitions per brand | White-label brands may want different competitions for different program types (1-step vs 2-step) | HIGH | Competition schema needs `programFilter` field; enrollment query filters by program type |
-| Tiered prize structure (top 3 + random lottery for 4-100) | FundedNext's lottery mechanic for mid-table traders dramatically increases engagement; more traders feel they can win | HIGH | Needs random selection logic, verifiable seed, prize type enum (cash / funded account / evaluation) |
-| Admin competition management UI | Admins need to create, edit, start, end, and manually award competitions without code deploys | HIGH | New admin section; competition CRUD; trigger manual finalization; override winner |
-| Per-brand competition config | White-label requirement: each brand has independent competitions, prize pools, enrollment rules | MEDIUM | Competition doc scoped to `brandId`; consistent with per-brand DB architecture |
-| Competition history page | Shows credibility — FTMO, FundedNext all surface historical results with winner names and amounts | LOW | Simple list of past competitions with winner rows; reuse table components |
+These are not optional — the wrong default causes partner disputes or bad data.
 
-### Anti-Features (Commonly Requested, Often Problematic)
+#### Decision 1: Conversion = First Purchase Only (FTD) or Every Purchase?
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Real-time leaderboard updates (sub-minute) | Feels dynamic and exciting | MT5 data pipeline is cron-based (precomputed collection); sub-minute polling would require full streaming refactor; high infra cost for marginal UX gain | Cache at 45–60s (already implemented); show "last updated" timestamp so traders understand cadence |
-| Showing all trader stats publicly (drawdown, trade history, balance) | More transparency = more trust | Email is PII; balance reveals account size which traders treat as private; GDPR concerns for EU traders | Show: rank, initials/avatar, profit %, win rate, trading days. Hide: email, MT5 account ID, exact balance, full name (unless logged in) |
-| Self-enrollment (opt-in) competition model | Seems fairer — only committed traders enter | Dramatically lowers participation numbers (most traders won't bother); empty leaderboard kills social proof | Opt-out model: all eligible funded traders auto-enrolled; opt-out via profile setting. Matches FundingPips/FXIFY approach |
-| Separate competition MT5 accounts | FundingPips runs competitions on dedicated MatchTrader instances; clean separation | Requires provisioning separate MT5 logins per competition; massive ops complexity for white-label | Use existing funded accounts, filter by enrollment period; rank by % growth from competition start date |
-| Publicly displaying MT5 account IDs | Some platforms show account numbers | MT5 account ID leaks account existence; combines with rank to reveal account size tier | Show account size tier label ("$100K Account") not raw MT5 login number |
+**Recommendation: First purchase only (FTD model).** Standard in CPA/affiliate networks. Prop-firm traders repurchase repeatedly after breaches; firing on every purchase would inflate the partner's commission count and may get the integration flagged as fraudulent.
+
+**Implementation impact:** Requires a check at conversion postback time: "is this the user's first completed payment?" This is a DB query (`Payment.countDocuments({ userId, status: 'completed' }) === 1`) at the point the postback fires. No existing flag captures this today.
+
+#### Decision 2: Payout Value = Which Amount Field?
+
+**Recommendation: `usdAmount`** — the normalised USD figure already on the Payment document (`payment.interface.ts:102`). This is what the existing UTM analytics and sales ticker use for cross-currency reporting. Amount resolution in `salesWebhookEmit.ts:38` is: `paidAmount ?? totalPrice ?? amount` for the charged amount and `usdAmount` separately.
+
+The Payment model carries:
+- `paidAmount` — actual collected amount in billed currency
+- `totalPrice` — listed price before discounts in billed currency
+- `usdAmount` — normalised USD (use this for the postback `payout` param)
+- `amount` — raw provider field (unreliable, avoid)
+
+If the partner's tracking system is currency-native (e.g. they bill in JPY), send `paidAmount` and also include a `currency` param. **Must be confirmed with the partner contract.**
+
+#### Decision 3: Attribution Window (Cookie TTL)
+
+**Recommendation: 30 days** (`max-age=2592000`). Standard industry default for prop-firm funnels where visitors deliberate before registering. The User-level `partnerClickId` has no expiry — stored at registration, persists until explicitly nulled or a retention policy clears it.
+
+#### Decision 4: Behaviour When a User Registers Without a Click ID
+
+**Recommendation: Silent skip.** No `partner_clickid` cookie present at registration → do not store anything → do not fire registration postback or conversion postback for that user.
+
+---
+
+### Differentiators (Nice-to-Have, Not in Scope for v1.3)
+
+| Feature | Value Proposition | Status | Complexity | Notes |
+|---------|-------------------|--------|------------|-------|
+| Goal-name mapping config | Different partners use different `goal=` param names | DEFER | LOW | Hardcode `goal=registration` and `goal=conversion` for now. Config table is a one-line change when a second partner needs different names. |
+| Payout source configurability | Some partners want sale price, others a fixed commission, others a percentage | DEFER | LOW | Hardcode `usdAmount` for v1.3. Add a config knob when a second partner has different requirements. |
+| Per-brand partner config via admin UI | Multiple brands can each have their own partner URL | DEFER | MEDIUM | v1.3 is Trading Cult only. Use env var or brand-settings constant. The per-DB model handles brand isolation automatically. |
+| Attribution-window configurability | Cookie TTL and user-record expiry are configurable | DEFER | LOW | Hardcode 30-day cookie for v1.3. |
+| Delivery retry with backoff | If partner postback URL returns 5xx, retry up to N times | DEFER | MEDIUM | Log failures; let ops retry manually for single partner. The `ConversionWebhookDeliveryLog` pattern (`Admin/ConversionWebhook/conversion-webhook.service.ts:173`) can be reused when retry is needed. |
+
+---
+
+### Anti-Features (Explicitly Do Not Build)
+
+| Feature | Why It Seems Attractive | Why Wrong for v1.3 | What to Do Instead |
+|---------|------------------------|---------------------|-------------------|
+| Generic multi-partner admin UI | "We'll need more partners" | Premature generalisation; adds a DB collection, admin CRUD, validation, and dashboard UI for one config row. Partners come one at a time. | Hardcode the one partner's URL in env/brand settings. Extract to admin UI only when a second partner is onboarded. |
+| Reuse the existing `conversionWebhook` destination adapter | It already exists and fires for some events | Two problems: (1) the `EVENT_NAME_MAP` (`destinations/conversion-webhook.ts:19-25`) does not include `signup_completed` or `purchase_completed`; and (2) the delivery path sends a POST with a JSON body and HMAC signature headers (`conversion-webhook.service.ts:128-152`) — the partner expects a GET request with query params (`?clickid=X&goal=Y&payout=Z`). Forcing this would require hacking the adapter's wire protocol and polluting the shared webhook settings with partner-specific config. | Write a thin, separate `partnerPostbackService` that fires a GET to the partner URL with the correct query params. Keep it isolated from the general-purpose webhook infrastructure. |
+| Cookie-only click ID propagation (no DB storage) | Simpler — fewer schema changes | Cookies expire (30 days), get cleared by the user, or may not reach the server at purchase callback time (which can come from a payment provider's async webhook, not a browser request). | Store `partnerClickId` on the User document at registration. Read from User (not cookie) at purchase time. |
+| Fire conversion postback on every purchase | Maximises event count | CPA networks attribute one conversion per user (FTD model). Double-firing for repurchases inflates commissions and can get the integration flagged as fraudulent by the partner. | Gate conversion postback on first purchase only (FTD check). |
+| Hash or encode the click ID before storage | "Security / data hygiene" | The partner's tracking system requires the exact raw click ID to reconcile attribution on their side. Any transformation breaks their lookup. | Store and transmit the raw URL-decoded value verbatim. |
+| Pull API for partner | Avoids postback plumbing | Explicitly deferred per milestone context. More complex; requires partner to poll us; postbacks are the industry-standard pattern for CPA networks. | Postbacks first; pull API in a later milestone if partner requests it. |
+
+---
+
+## Key Implementation Gaps (Grounded in Code)
+
+These are not features — they are code facts that constrain implementation and must inform the roadmap estimate.
+
+**Gap 1: `signupCompleted` helper has zero callers.**
+`TrackingEvents.signupCompleted` is defined at `tracking.events.service.ts:38` but a global search finds no callers anywhere in `pft-backend/src`. The `signup_completed` event never actually fires today. The postback milestone must also wire the registration callsite.
+
+**Gap 2: `conversionWebhookAdapter` silently skips `signup_completed` and `purchase_completed`.**
+The `EVENT_NAME_MAP` (`destinations/conversion-webhook.ts:19-25`) maps only five events: `phase_passed`, `account_breached`, `payout_completed`, `kyc_verified`, `account_funded`. Both events needed for the partner postback fall through to `status: "skipped"` at line 50-52. The existing adapter cannot be used as-is.
+
+**Gap 3: The existing `conversionWebhook` adapter sends POST JSON, not GET query params.**
+The partner postback protocol is `GET https://partner-domain.com/postback?clickid=X&goal=Y&payout=Z`. The `deliverPayload` method (`conversion-webhook.service.ts:128-152`) sends `POST` with `Content-Type: application/json`, `X-Webhook-Signature`, and a JSON body. These are incompatible wire protocols requiring a separate delivery function.
+
+**Gap 4: `purchase_completed` in the SalesWebhook path does not hook a partner postback.**
+`emitPurchaseCompletedWebhook` (`payment.service.modular.ts:1499` calling `salesWebhookEmit.ts:40`) routes through `SalesWebhookService` to all configured SalesWebhook records. It carries `amount`, `usdAmount`, `currency` and is deduped on `paymentId`. This is the right trigger point to hook — but it needs a new branch that reads the `userId`, looks up the user's `partnerClickId`, and fires the partner GET postback separately.
+
+**Gap 5: No `partnerClickId` field on the User model.**
+`PaymentAttribution` (`payment.interface.ts:4-19`) covers ad-platform click IDs but not a generic partner click ID. The User model has no attribution storage. A new `partnerClickId?: string` field is required.
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Public leaderboard page]
-    └──requires──> [Public API endpoint (no auth)]
-                       └──requires──> [Data masking layer (strip PII for anonymous)]
+[Tracking link endpoint GET /track?clickid=X]
+    └──produces──> [partner_clickid cookie in browser]
+                        └──read at registration──> [partnerClickId stored on User doc]
+                                                        ├──fires──> [Registration postback (GET)]
+                                                        └──read at purchase──> [Conversion postback (GET)]
+                                                                                    └──guarded by──> [FTD check]
+                                                                                    └──includes──> [payout=usdAmount]
 
-[Competition leaderboard]
-    └──requires──> [Competition data model (MongoDB)]
-                       └──requires──> [Admin competition CRUD]
+[Idempotency]
+    └──gates both──> [Registration postback] AND [Conversion postback]
 
-[Your rank highlight]
-    └──requires──> [Public leaderboard page]
-    └──requires──> [Auth check on public page]
-
-[Opt-out preference]
-    └──requires──> [User profile setting]
-    └──requires──> [Public API respects opt-out flag]
-
-[Competition auto-enrollment]
-    └──requires──> [Competition data model]
-    └──requires──> [Eligible-trader query logic]
-
-[Competition finalization + prize award]
-    └──requires──> [Competition auto-enrollment]
-    └──requires──> [Admin competition management UI]
-
-[Past winners / hall of fame]
-    └──requires──> [Competition finalization stores winner snapshot]
-
-[Tiered lottery prizes]
-    └──requires──> [Competition finalization]
-    └──enhances──> [Past winners page (publishable RNG proof)]
+[signupCompleted caller wiring]
+    └──prerequisite for──> [Registration postback]
 ```
 
 ### Dependency Notes
 
-- **Public API requires data masking:** The existing leaderboard routes are auth-gated (`Auth(userRole.admin, userRole.backOffice)`). A new public route must be added that returns the same data structure but with PII fields stripped or masked. Do not remove auth from existing admin routes.
-- **Competition leaderboard is NOT the live precomputed leaderboard:** Competition rankings are a snapshot — profit % growth measured from competition `startDate`, not all-time. Needs separate computation or a filtered view using leaderboard snapshots taken at competition start.
-- **Opt-out requires user model change:** A `leaderboardOptOut: boolean` field on the User document, respected in both the public and competition enrollment queries.
+- **Tracking link endpoint is the entry point** — nothing downstream works without it. No upstream dependencies.
+- **User model change is a prerequisite for everything** — `partnerClickId` must exist on the User document before registration capture, registration postback, or conversion postback can work.
+- **`signupCompleted` must be wired at the registration callsite** — the helper exists but is never called. Registration postback cannot piggyback on a non-firing event.
+- **FTD check must be decided before conversion postback is implemented** — it affects whether the check happens at the `emitPurchaseCompletedWebhook` callsite or in the partner postback service itself.
+- **Payout amount field must be decided before conversion postback is implemented** — it affects which Payment field is read when constructing the postback URL.
 
 ---
 
 ## MVP Definition
 
-### Launch With (v1)
+### Launch With (v1.3)
 
-Minimum to have a working public leaderboard + competition system.
+- [ ] `GET /track` endpoint — reads `?clickid`, sets `partner_clickid` cookie (30-day, Secure, SameSite=Lax), redirects to homepage
+- [ ] `partnerClickId?: string` field added to User model / schema
+- [ ] Click ID capture at registration — read `partner_clickid` cookie from request, write to User document at signup
+- [ ] Wire `TrackingEvents.signupCompleted` caller at registration callsite (prerequisite — currently has zero callers)
+- [ ] Registration postback service — when `signup_completed` fires for a user with a `partnerClickId`, fire `GET {partnerUrl}?clickid={id}&goal=registration`
+- [ ] Conversion postback service (FTD-gated) — on first `purchase_completed` for a user with a `partnerClickId`, fire `GET {partnerUrl}?clickid={id}&goal=conversion&payout={usdAmount}`
+- [ ] Idempotency — registration deduped on `eventId`; conversion deduped on `paymentId`
+- [ ] Delivery log — new `PartnerPostbackLog` collection (or reuse `ConversionWebhookDeliveryLog` pattern) with: `userId`, `clickId`, `goal`, `payoutAmount`, `status`, `httpStatus`, `error`, `firedAt`
+- [ ] Partner URL config — env var `PARTNER_POSTBACK_URL` (or brand settings constant); not a DB admin UI
 
-- [ ] Public leaderboard API endpoint — anonymous access, PII stripped, returns rank/initials/profit%/winRate/tradingDays
-- [ ] Public leaderboard page — `/leaderboard` route, no auth wall, reuses LeaderboardTable with masked data mode
-- [ ] Logged-in name reveal — auth check on public page unlocks full name, highlights own row
-- [ ] Trader opt-out preference — `leaderboardOptOut` flag on User, profile UI toggle, respected in public API
-- [ ] Competition data model — MongoDB schema: name, brandId, startDate, endDate, prizePool, status, enrolledTraders[], winners[]
-- [ ] Admin competition creation — form to create competition (name, dates, prize pool, eligible program types)
-- [ ] Auto-enrollment cron/trigger — when competition starts, enroll all funded traders matching program filter who haven't opted out
-- [ ] Competition leaderboard — ranked by % profit growth from competition startDate; separate endpoint `/competitions/:id/leaderboard`
-- [ ] Competition public page — hero (prize pool + countdown), leaderboard table, "Your rank" if logged in
-- [ ] Competition finalization — admin triggers end; snapshots top N winners; stores result
+### Hardcoded for v1.3 (Not Configurable)
 
-### Add After Validation (v1.x)
+- Partner URL: env var / brand constant
+- Goal names: `goal=registration`, `goal=conversion`
+- Payout field: `usdAmount`
+- Attribution window: 30-day cookie
+- Scope: Trading Cult brand DB only
+- Conversion definition: FTD only (first completed payment per user)
 
-- [ ] Competition history page — list of past competitions with winners; adds social proof
-- [ ] Past winners "hall of fame" on main leaderboard — reuse/extend WeeklyPrizeWinners pattern
-- [ ] Multiple active competitions per brand — UI to list/switch; schema already supports it if brandId-scoped
-- [ ] Timeframe filter on public leaderboard — "This Month" / "All Time" tabs
+### Add After Second Partner is Onboarded (v1.x)
 
-### Future Consideration (v2+)
+- [ ] Config table for goal-name mapping per partner
+- [ ] Payout source configurability
+- [ ] Admin UI for partner URL config
 
-- [ ] Tiered lottery prize mechanic — significant complexity (RNG, proof-of-fairness, prize type enum); high engagement upside but needs product validation first
-- [ ] Competition notification emails — "Competition started", "You're in top 10", "Competition ends in 24h"
-- [ ] Social share card — trader-specific OG image showing rank + profit %; requires image generation service
-- [ ] Leaderboard embed iFrame — for brands to embed on their marketing site; low demand until brands request it
+### Future (v2+)
+
+- [ ] Generic multi-partner admin UI
+- [ ] Pull API for partner reporting
+- [ ] Retry with exponential backoff
 
 ---
 
 ## Feature Prioritization Matrix
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Public leaderboard page (anonymous) | HIGH | LOW (reuse existing components + new API) | P1 |
-| PII masking on public API | HIGH | LOW | P1 |
-| Logged-in name reveal + self-highlight | HIGH | LOW | P1 |
-| Trader opt-out | MEDIUM | LOW | P1 |
-| Competition data model + admin creation | HIGH | MEDIUM | P1 |
-| Auto-enrollment | HIGH | MEDIUM | P1 |
-| Competition leaderboard (% growth from start) | HIGH | MEDIUM | P1 |
-| Competition public page | HIGH | MEDIUM | P1 |
-| Competition finalization + winner snapshot | HIGH | MEDIUM | P1 |
-| Competition history page | MEDIUM | LOW | P2 |
-| Hall of fame on main leaderboard | MEDIUM | LOW | P2 |
-| Timeframe filter on public leaderboard | MEDIUM | MEDIUM | P2 |
-| Multiple competitions per brand | LOW | MEDIUM | P2 |
-| Tiered lottery prizes | MEDIUM | HIGH | P3 |
-| Competition email notifications | MEDIUM | HIGH | P3 |
-| Social share card | LOW | HIGH | P3 |
-
----
-
-## Public vs. Private Data Matrix
-
-Critical design decision: what to show at each auth level.
-
-| Data Field | Unauthenticated | Logged In (Own Entry) | Logged In (Others) | Admin |
-|------------|-----------------|----------------------|-------------------|-------|
-| Rank | Yes | Yes | Yes | Yes |
-| Avatar initials | Yes | Yes | Yes | Yes |
-| Full name | No | Yes | Yes | Yes |
-| Email | No | Yes | No | Yes |
-| MT5 account ID | No | Yes | No | Yes |
-| Profit % growth | Yes | Yes | Yes | Yes |
-| Win rate | Yes | Yes | Yes | Yes |
-| Trading days | Yes | Yes | Yes | Yes |
-| Account size tier label | Yes | Yes | Yes | Yes |
-| Exact balance/equity | No | Yes | No | Yes |
-| Max drawdown | Yes (%) | Yes | Yes | Yes |
-| Program type label | Yes | Yes | Yes | Yes |
-
----
-
-## Competitor Feature Analysis
-
-| Feature | FXIFY | FundingPips | FundedNext | Our Approach |
-|---------|-------|-------------|------------|--------------|
-| Public leaderboard | Yes (no login needed) | Yes (blog posts confirm; live page 403'd) | Yes (real-time updates) | Yes — new public route, mask PII |
-| Competition format | Monthly, top 12 win funded accounts | Monthly, MatchTrader separate instance, top 20 + prizes | 30-day sprint, top 3 cash+funded, 4-100 lottery | Monthly, use existing funded accounts, % growth from start date |
-| Ranking metric | Leaderboard performance (profit %) | Profit % (MatchTrader computed) | Live equity / profit % | `valueGrowthPercentage` (already computed) |
-| Prize type | Free challenge accounts up to $400K | Cash + funded account evaluations | Cash + funded accounts | Admin-configured; store as prize description string for v1 |
-| Opt-out | Unknown (blocked) | Unknown (blocked) | Implied opt-in model | Opt-out model (auto-enrolled, can opt out) |
-| Auth gate | Public (no login for rankings) | Public | Login shows personal rank | Public page, login reveals own rank highlight |
-| Historical results | Unknown | Blog posts | Yes (monthly stats table) | Yes — v1.x competition history page |
+| Feature | Partner Value | Implementation Cost | Priority |
+|---------|--------------|---------------------|----------|
+| Tracking link endpoint | HIGH | LOW | P1 |
+| `partnerClickId` on User model | HIGH | LOW | P1 |
+| Wire `signupCompleted` callsite | HIGH | LOW | P1 — unblocks registration postback |
+| Registration postback (GET) | HIGH | MEDIUM | P1 |
+| Conversion postback with FTD check | HIGH | MEDIUM | P1 |
+| Idempotency / dedup | HIGH | LOW | P1 |
+| Delivery log | MEDIUM | LOW | P1 |
+| Admin config UI for partner URL | LOW | MEDIUM | P3 — hardcode for v1.3 |
+| Retry / backoff | LOW | MEDIUM | P3 — defer |
 
 ---
 
 ## Sources
 
-- [FundedNext Competition page](https://fundednext.com/competition) — HIGH confidence, page loaded fully; confirms real-time leaderboard, public prize structure, login for personal rank
-- [FundingPips 30-Day Sprint blog](https://www.fundingpips.com/en/blog/the-30-day-sprint-climb-the-leaderboard-claim-your-reward) — MEDIUM confidence (403 on main leaderboard page; blog accessible)
-- [FXIFY $1M competition announcement](https://thegodfunded.com/en/news/fxify-unveils-1m-monthly-trading-competition) — MEDIUM confidence via third-party news
-- [GrowYourPropFirm competition guide](https://www.growyourpropfirm.com/prop-firms-trading-competitions) — MEDIUM confidence (aggregator, consistent with primary sources)
-- [PropFunding.com leaderboard metrics guide](https://blog.propfunding.com/funded-trader-leaderboard-what-it-tracks-why-it-matters-and-how-prop-firms-use-rankings/) — MEDIUM confidence
-- [VerticalWise leaderboard operator guide](https://www.verticalwise.com/how-trader-leaderboards-help-prop-firms-grow-and-why-operators-are-adding-them/) — MEDIUM confidence
-- Existing codebase: `leaderboard.interface.ts`, `leaderboard.model.ts`, `leaderboard.routes.ts`, `LeaderboardTable.tsx` — HIGH confidence (source of truth for what's built)
+All EXISTS claims grounded in code reads at:
+
+- `pft-backend/src/app/modules/Tracking/tracking.constants.ts:29, 40` — default-on toggles for `signup_completed` and `purchase_completed` on `conversionWebhook` destination
+- `pft-backend/src/app/modules/Tracking/destinations/conversion-webhook.ts:19-25` — `EVENT_NAME_MAP` (the critical gap — neither `signup_completed` nor `purchase_completed` is present)
+- `pft-backend/src/app/modules/Tracking/tracking.events.service.ts:38` — `signupCompleted` helper definition (confirmed zero callers in codebase)
+- `pft-backend/src/app/modules/Tracking/tracking.interface.ts:168-250` — `ITrackingEventPayload` full field list; ad-platform click IDs at lines 194-200; no `partnerClickId`
+- `pft-backend/src/app/modules/Tracking/dedup/dedup.service.ts:14` — dedup via `eventId` + unique index on `TrackingEventLog`
+- `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.service.ts:128-152` — POST JSON delivery protocol (incompatible with partner GET/query-param protocol)
+- `pft-backend/src/app/modules/Payment/payment.interface.ts:4-19, 100-196` — `PaymentAttribution` (no `partnerClickId`), `IPayment` fields including `paidAmount`, `totalPrice`, `usdAmount`, `amount`
+- `pft-backend/src/app/modules/Payment/utils/salesWebhookEmit.ts:38` — amount resolution order: `paidAmount ?? totalPrice ?? amount`; `usdAmount` also available
+- `pft-backend/src/app/modules/SalesWebhook/salesWebhook.dispatch.ts:72-93` — `purchaseCompleted` dispatch with `dedupeKey: paymentId`; carries `amount`, `usdAmount`, `currency`
+- `pft-backend/src/app/modules/Payment/payment.service.modular.ts:1499` — `emitPurchaseCompletedWebhook` callsite (the correct trigger hook for conversion postback)
 
 ---
-*Feature research for: Public leaderboard + monthly competition system (prop trading platform)*
-*Researched: 2026-06-28*
+
+*Feature research for: v1.3 CRM Partner Tracking — S2S Postbacks (Trading Cult one-off)*
+*Researched: 2026-07-01*
