@@ -135,13 +135,17 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 09-01-PLAN.md — Backend: attach queue state to PAP funded-leg payment response (join `fundedprogressionqueues` via `FundedProgressionQueueService`, keyed userId + nextStageProgramId, status in [pending, processing]). Dashboard: read queue state in `PaymentsContainer`/`PaymentDetailsContainer`, conditional render of queue-state label + suppress Retry/Mark Done on queue-gated rows.
+- [ ] 09-01-PLAN.md — Backend: enrich `getPaymentHistoryAdmin` with a `paymentId`-keyed FundedProgressionQueue batch join (mirrors the proven user-facing `getPaymentHistory` pattern) so each admin payment row carries `fundedDeferral: { reason, status, kycApproved, contractApproved }`; add sparse `{ paymentId: 1 }` index. Dashboard: shared `getQueueStateLabel` helper + branch `ProgramAssignmentBadge` (PaymentsTable) and Action Required card (PaymentDetailsContainer) on `payment.fundedDeferral` — render blue informational "Awaiting KYC / Awaiting Contract / Awaiting KYC & Contract / In Funded Queue" and HIDE Retry + Mark Done on queue-gated rows; preserve existing amber "Program Not Assigned" + buttons on genuine failures. Deferred post-deploy human-verify against NSF diagnostic payment 6a2c08b1ab4caef5631099a2.
 
 **Technical context:**
-- Backend extension point: `pft-backend/src/app/modules/Payment/` — either enrich the existing payment response (recommended: append `queueState: { status, kycApproved, contractApproved } | null` per PAP funded-leg row) or ship a separate `GET /funded-queue/state?userId=&programId=` lookup endpoint. `FundedProgressionQueueService` already exists; key: `(userId, nextStageProgramId)`.
-- Dashboard grep anchor: search `"Program Not Assigned"` in `pft-dashboard/src/` to locate the rendering branch. Conditional render pattern precedent: `PaymentsContainer` / `PaymentDetailsContainer` in `pft-dashboard/src/app/(dashboard)/_components/modules/admin/`.
-- Label derivation: `kycApproved=false` → "Awaiting KYC"; `kycApproved=true && contractApproved=false` → "Awaiting Contract"; both true → "In Funded Queue".
-- Reference memory: `reference_pap_funded_queue_gate.md` — captures workaround (approve KYC → auto-release) and prior AI notes.
+- Backend extension point (LOCKED per RESEARCH.md): mirror `getPaymentHistory` lines 1778–1798 into `getPaymentHistoryAdmin` before its `enriched = history.map` at ~line 2044. `payment.service.modular.ts`. Batch join keyed by `paymentId` (NOT userId+nextStageProgramId — join key correction per research), sort createdAt desc, first-wins per paymentId. `skipEnrichment=true` (CSV export) skips the join.
+- Dashboard sites (LOCKED per RESEARCH.md): `PaymentsTable.tsx` `ProgramAssignmentBadge` (lines ~214–303) + `PaymentDetailsContainer.tsx` Action Required card (lines ~578–658). Both keep the `programAssigned === false` outer guard and add an inner branch on `payment.fundedDeferral`. `PaymentData.fundedDeferral` is ALREADY declared in `usePayments.ts` — no type change.
+- Label derivation (LOCKED per RESEARCH.md): `status ∉ {pending,processing}` → null; both flags false → "Awaiting KYC & Contract"; kyc=false only → "Awaiting KYC"; contract=false only → "Awaiting Contract"; both true → "In Funded Queue". `programAssigned` is unreliable (diagnostic payment shows `programAssigned=true` while queue is pending) — do NOT gate on it.
+- Suppression choice (LOCKED per planner discretion): HIDE Retry + Mark Done on queue-gated rows (simplest, cleanest — success criterion accepts hidden or inert).
+- Index add (LOCKED per RESEARCH.md recommendation): sparse `{ paymentId: 1 }` on `FundedProgressionQueue` in the same commit — mongoose auto-builds on next backend boot, no manual migration.
+- Cache: 30s server TTL + 5min React Query staleTime — acceptable, no invalidation change. `?noCache=1` bypass available.
+- OUT OF SCOPE (deferred to v1.3): PAP-02 (Retry button relabel), PAP-03 (queue reason staleness). Do not touch either in Phase 9.
+- Reference memory: `reference_pap_funded_queue_gate.md` — captures workaround (approve KYC → auto-release) and prior AI notes. DEV ticket: cmqbzq6vc007ds50k008tr3du.
 
 ## Progress
 
@@ -156,4 +160,4 @@ Plans:
 | 6. Funded Queue Ready Badge | ad-hoc | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 7. Used Margin Display | ad-hoc | 2/2 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 8. Breach Email Template Vars | ad-hoc | 1/1 | ✓ Complete (ops sync + verify pending deploy) | 2026-06-30 |
-| 9. PAP Funded Queue State Label | v1.2 | 0/1 | Not started | - |
+| 9. PAP Funded Queue State Label | v1.2 | 0/1 | Planned | - |
