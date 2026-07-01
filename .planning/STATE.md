@@ -48,14 +48,12 @@ Full decision log in PROJECT.md Key Decisions table. Recent decisions affecting 
 
 ### Pending Todos
 
-1. Setup free trial Program docs for Funding Optimal (ops, no code — see `.planning/todos/pending/2026-07-01-setup-free-trial-program-docs-for-funding-optimal.md`). Deferred until after v1.2 Phase 9.
-
-v1.2 Phase 9 is the active task — run `/gsd:plan-phase 9`.
+1. Setup free trial Program docs for Funding Optimal (ops, no code — see `.planning/todos/pending/2026-07-01-setup-free-trial-program-docs-for-funding-optimal.md`). Now unblocked — Phase 9 code-complete. Next actionable task.
 
 ### Blockers/Concerns
 
-- Phase 9 backend join: two valid shapes — enrich existing payment response OR separate lookup endpoint. Plan-phase must pick one and document the decision.
-- All prior phases (4.1 through 8) await the next main-2026 deploy before human-verify can run.
+- Phase 9 backend join: resolved — enriched existing `getPaymentHistoryAdmin` response (not a separate endpoint), keyed by `paymentId` batch `$in`. Decision recorded in 09-01-SUMMARY.md.
+- All phases 4.1 through 9 await the next main-2026 deploy before human-verify can run (v1.0/v1.1 too).
 
 ## Session Continuity
 

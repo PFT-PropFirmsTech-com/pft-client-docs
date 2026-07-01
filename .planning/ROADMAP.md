@@ -4,7 +4,7 @@
 
 - ✅ **v1.0 Leaderboard & Competitions** — Phases 1-3, 10 plans (shipped 2026-06-29) → [archive](milestones/v1.0-ROADMAP.md)
 - ✅ **v1.1 Affiliate Reporting** — Phase 4, 4 plans (shipped 2026-06-30, ad-hoc) → [archive](milestones/v1.1-ROADMAP.md)
-- 🚧 **v1.2 PAP Funded Queue State Label** — Phase 9, 1 plan (in progress)
+- 🚧 **v1.2 PAP Funded Queue State Label** — Phase 9, 1 plan (code-complete 2026-07-01, human-verify pending deploy)
 
 ## Phases
 
@@ -135,7 +135,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 09-01-PLAN.md — Backend: enrich `getPaymentHistoryAdmin` with a `paymentId`-keyed FundedProgressionQueue batch join (mirrors the proven user-facing `getPaymentHistory` pattern) so each admin payment row carries `fundedDeferral: { reason, status, kycApproved, contractApproved }`; add sparse `{ paymentId: 1 }` index. Dashboard: shared `getQueueStateLabel` helper + branch `ProgramAssignmentBadge` (PaymentsTable) and Action Required card (PaymentDetailsContainer) on `payment.fundedDeferral` — render blue informational "Awaiting KYC / Awaiting Contract / Awaiting KYC & Contract / In Funded Queue" and HIDE Retry + Mark Done on queue-gated rows; preserve existing amber "Program Not Assigned" + buttons on genuine failures. Deferred post-deploy human-verify against NSF diagnostic payment 6a2c08b1ab4caef5631099a2.
+- [x] 09-01-PLAN.md — Backend: enrich `getPaymentHistoryAdmin` with a `paymentId`-keyed FundedProgressionQueue batch join (mirrors the proven user-facing `getPaymentHistory` pattern) so each admin payment row carries `fundedDeferral: { reason, status, kycApproved, contractApproved }`; add sparse `{ paymentId: 1 }` index. Dashboard: shared `getQueueStateLabel` helper + branch `ProgramAssignmentBadge` (PaymentsTable) and Action Required card (PaymentDetailsContainer) on `payment.fundedDeferral` — render blue informational "Awaiting KYC / Awaiting Contract / Awaiting KYC & Contract / In Funded Queue" and HIDE Retry + Mark Done on queue-gated rows; preserve existing amber "Program Not Assigned" + buttons on genuine failures. Deferred post-deploy human-verify against NSF diagnostic payment 6a2c08b1ab4caef5631099a2.
 
 **Technical context:**
 - Backend extension point (LOCKED per RESEARCH.md): mirror `getPaymentHistory` lines 1778–1798 into `getPaymentHistoryAdmin` before its `enriched = history.map` at ~line 2044. `payment.service.modular.ts`. Batch join keyed by `paymentId` (NOT userId+nextStageProgramId — join key correction per research), sort createdAt desc, first-wins per paymentId. `skipEnrichment=true` (CSV export) skips the join.
@@ -160,4 +160,4 @@ Plans:
 | 6. Funded Queue Ready Badge | ad-hoc | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 7. Used Margin Display | ad-hoc | 2/2 | ✓ Complete (human-verify pending deploy) | 2026-06-30 |
 | 8. Breach Email Template Vars | ad-hoc | 1/1 | ✓ Complete (ops sync + verify pending deploy) | 2026-06-30 |
-| 9. PAP Funded Queue State Label | v1.2 | 0/1 | Planned | - |
+| 9. PAP Funded Queue State Label | v1.2 | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-07-01 |
