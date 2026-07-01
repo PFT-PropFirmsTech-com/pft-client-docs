@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 ## Current Position
 
 Phase: 9 of 9 (PAP Funded Queue State Label)
-Plan: 0/1 — ready to plan
-Status: v1.2 roadmap created — Phase 9 defined, awaiting plan-phase
-Last activity: 2026-07-01 — v1.2 milestone initialized; Phase 9 roadmapped
+Plan: 1/1 — code complete, awaiting deploy
+Status: v1.2 Phase 9 code-complete — both repos pushed to origin/main-2026; Task 3 (post-deploy human-verify) deferred pending deploy
+Last activity: 2026-07-01 — Completed 09-01-PLAN.md (backend batch join + sparse index + dashboard queue-state branching)
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · Phase 4.1 [██████████] 100% (1/1) · Phase 5 [██████████] 100% (1/1) · Phase 6 [██████████] 100% (1/1) · Phase 7 [██████████] 100% (2/2) · Phase 8 [██████████] 100% (1/1) · v1.2 Phase 9 [░░░░░░░░░░] 0% (0/1)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · Phase 4.1 [██████████] 100% (1/1) · Phase 5 [██████████] 100% (1/1) · Phase 6 [██████████] 100% (1/1) · Phase 7 [██████████] 100% (2/2) · Phase 8 [██████████] 100% (1/1) · v1.2 Phase 9 [██████████] 100% (1/1 code-complete)
 
-**Open post-deploy:** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4 — Purchase Report card + admin CSV cols + single-POST network) + Phase 4.1 (CSV tier-sum + Direct Commission Rate header) + Phase 5 (Daily P&L ~$20 for TC account 13535/2026-06-18) + Phase 6 (sidebar dot on TC funded queue — remote shape: `eligibleManualApproval` field via /funded-queue/stats) + Phase 7 (MarginUsageCard on TC funded account, both client + admin routes) + Phase 8 (ops sync script per brand XPIPS + Funding Optimal, then verify breach email body). All gated on next main-2026 deploy.
+**Open post-deploy:** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4 — Purchase Report card + admin CSV cols + single-POST network) + Phase 4.1 (CSV tier-sum + Direct Commission Rate header) + Phase 5 (Daily P&L ~$20 for TC account 13535/2026-06-18) + Phase 6 (sidebar dot on TC funded queue — remote shape: `eligibleManualApproval` field via /funded-queue/stats) + Phase 7 (MarginUsageCard on TC funded account, both client + admin routes) + Phase 8 (ops sync script per brand XPIPS + Funding Optimal, then verify breach email body) + Phase 9 Task 3 (admin queue-state label human-verify against NSF diagnostic payment 6a2c08b1ab4caef5631099a2). All gated on next main-2026 deploy.
 
 ## Performance Metrics
 
@@ -43,6 +43,8 @@ Full decision log in PROJECT.md Key Decisions table. Recent decisions affecting 
 - Phase 9 scope is PAP funded-leg rows ONLY — non-PAP rows get no queue lookup and no layout change.
 - Retry/Mark Done suppression (Item 2 from DEV cmqbzq6vc007ds50k008tr3du) included in Phase 9 success criteria; button relabel deferred to v1.3 (depends on label taxonomy locked by Phase 9).
 - PAP-02 (Retry suppress/relabel) and PAP-03 (queue reason staleness) explicitly deferred to v1.3 — not in scope here.
+- Phase 9 execution: getQueueStateLabel extracted to _shared/paymentQueueLabel.ts (not inlined) for clean cross-component sharing; IIFE pattern used in PaymentDetailsContainer JSX for multi-return branching; skipEnrichment=true already gates CSV export via early return.
+- Phase 9 execution: admin batch join named adminPaymentIdToDeferral to avoid shadowing user-facing paymentIdToDeferral in same file scope.
 
 ### Pending Todos
 
@@ -58,5 +60,5 @@ v1.2 Phase 9 is the active task — run `/gsd:plan-phase 9`.
 ## Session Continuity
 
 Last session: 2026-07-01
-Stopped at: v1.2 roadmap created — ROADMAP.md + STATE.md written, REQUIREMENTS.md traceability confirmed (PAP-01 → Phase 9 already present).
-Resume file: None — next action is `/gsd:plan-phase 9`.
+Stopped at: Phase 9 code-complete. backend commit 5de7c9f8 + dashboard commit 5dea14f2 pushed to origin/main-2026. Task 3 (post-deploy human-verify) deferred.
+Resume file: .planning/phases/09-pap-funded-queue-state-label/09-01-SUMMARY.md — Task 3 checklist.
