@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state. Trading Cult affiliate partner attributes registrations and conversions via S2S postbacks.
-**Current focus:** v1.3 CRM Partner Tracking — Phase 11 in progress (11-01 complete; next 11-02 purchaseCompleted/papPaymentCompleted wiring).
+**Current focus:** v1.3 CRM Partner Tracking — Phase 11 in progress (11-01 + 11-02 complete; next 11-03 dedup/config wiring).
 
 ## Current Position
 
 Phase: 11 of 12 (Wire Emits + Dedup) — in progress
-Plan: 1/3 (11-01 complete; 11-02 next)
-Status: 11-01 complete + pushed to origin/main-2026 (8e2f7509, 44deb3d4). Shared type surface landed; signupCompleted wired.
-Last activity: 2026-07-01 — 11-01 executed (8e2f7509 tracking types, 44deb3d4 auth wiring)
+Plan: 2/3 (11-01 + 11-02 complete; 11-03 next)
+Status: 11-02 complete + pushed to origin/main-2026 (644ccd39, 982ba9a1). purchaseCompleted wired at all standard sites; papPaymentCompleted fixed with usdAmount.
+Last activity: 2026-07-01 — 11-02 executed (644ccd39 purchase tracking util+standard sites, 982ba9a1 PAP fixes+fanbasis)
 
-**Phase 11 handoff:** `partnerClickId` now lives on the User doc + Payment `attribution` (server-authoritative from user doc). Partner tracking URL = `/api/tracking/track?clickid=…`. Phase 11 reads `user.partnerClickId` at the signup/purchase emit sites. 11-01 wired signupCompleted (zero→2 callers). 11-02 must wire purchaseCompleted/papPaymentCompleted.
+**Phase 11 handoff:** `partnerClickId` now lives on the User doc + Payment `attribution` (server-authoritative from user doc). Partner tracking URL = `/api/tracking/track?clickid=…`. Phase 11 reads `user.partnerClickId` at signup sites and `payment.attribution.partnerClickId` at purchase sites. 11-01 wired signupCompleted (zero→2 callers). 11-02 wired purchaseCompleted at all standard sites + fixed papPaymentCompleted (usdAmount, currency:USD, stable eventId, partnerClickId). 11-03 (dedup/config) is next.
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [████░░░░░░] 44% (4/9 plans)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [█████░░░░░] 56% (5/9 plans)
 
 **Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT).
 
@@ -39,7 +39,13 @@ Progress: v1.0 [██████████] 100% (10/10) · v1.1 [███�
 
 ### Decisions
 
-Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (11-01 additions):
+Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (11-02 additions):
+- fanbasis DOES provision PAP funded-legs (deferPapFundedLegIfNeeded gate + assignProgramToUser with payAfterPass fields) → papPaymentCompleted added in ensureProgramAssigned when payAfterPass && currentProgramId
+- FTD count === 1 (not === 0) at all standard sites: status="completed" is persisted before completion side-effects at all call sites
+- Stripe emit placed once in processPaymentCompletion (shared by both checkout.session.completed + payment_intent.succeeded) — single call site, stable eventId deduplicates if both events fire
+- Free PAP ($0): PAP-skip guard in util + no papPaymentCompleted on free path = zero conversion events for free PAP (correct per locked $0 decision)
+
+v1.3 locked decisions (11-01 additions):
 - eventId passthrough requires NO dispatcher change — fire() spreads args into payload; adding eventId as a typed field on helper arg types is sufficient
 - OTP registeredUser carries partnerClickId without projection fix — findByIdAndUpdate({ new: true }).toObject() returns full doc
 - FTD as isFirstPurchase boolean flag (not event suppression) — purchase_completed/pap_payment_completed fire on every purchase; Phase 12 gates postback on isFirstPurchase=true
@@ -82,5 +88,5 @@ v1.3 base locked decisions:
 ## Session Continuity
 
 Last session: 2026-07-01
-Stopped at: 11-01 complete — CRM-04 type surface (ITrackingEventPayload + helper arg types) + signupCompleted wired at both registration sites, pushed to main-2026 (44deb3d4). Phase 11 in progress. Ready for 11-02 (purchaseCompleted/papPaymentCompleted wiring).
-Resume file: .planning/phases/11-wire-emits-dedup/11-02-PLAN.md
+Stopped at: 11-02 complete — CRM-05+06 purchaseCompleted wired at all standard sites (emitTrackingPurchaseCompleted util) + papPaymentCompleted fixed (usdAmount/currency:USD/eventId/partnerClickId) at all PAP sites + fanbasis PAP wired, pushed to main-2026 (644ccd39, 982ba9a1). Phase 11 in progress. Ready for 11-03.
+Resume file: .planning/phases/11-wire-emits-dedup/11-03-PLAN.md
