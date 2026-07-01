@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state. Trading Cult affiliate partner attributes registrations and conversions via S2S postbacks.
-**Current focus:** v1.3 CRM Partner Tracking — Phase 11 complete (11-01, 11-02, 11-03 done); Phase 12 (partnerPostback adapter) is next.
+**Current focus:** v1.3 CRM Partner Tracking — Phase 12 in progress (12-01 done); 12-02 (adapter implementation) is next.
 
 ## Current Position
 
-Phase: 11 of 12 (Wire Emits + Dedup) — COMPLETE
-Plan: 3/3 (all plans complete)
-Status: Phase 11 code-complete + pushed to origin/main-2026 (8e2f7509/44deb3d4/644ccd39/982ba9a1/8540f5a). Verifier 6/6 passed, no Phase-12 scope leak. Ready to plan Phase 12.
-Last activity: 2026-07-01 — Phase 11 executed + verified (signup/purchase/PAP emits wired, FTD flag, dedup audit)
+Phase: 12 of 12 (Partner Postback Adapter) — IN PROGRESS
+Plan: 1/2 complete
+Status: Phase 12 plan 01 code-complete + pushed to origin/main-2026 (702b312f). Scoped tsc clean, grep counts 3/35 verified. Ready for 12-02 (adapter implementation).
+Last activity: 2026-07-01 — Phase 12 plan 01 executed (partnerPostback destination config: DESTINATIONS + IPartnerPostbackConfig + schema + validation + matrix column)
 
-**Phase 12 handoff:** Events now FIRE with all partner data: `signup_completed` (eventId `signup:<userId>` + partnerClickId), `purchase_completed` (eventId `purchase:<paymentId>` + partnerClickId + usdAmount + currency:USD + `isFirstPurchase` flag), `pap_payment_completed` (eventId `pap:<paymentId>` + partnerClickId + usdAmount). Phase 12 builds `destinations/partner-postback.ts` (GET + macro), routes these events → partnerPostback:true in tracking.constants, gates the CONVERSION send on `isFirstPurchase===true` (FTD once-per-user), and reads per-brand config from `TrackingSettings.destinations.partnerPostback` (Trading Cult). Free-trial/$0 = registration postback only. Dedup + eventIds already retry-safe (11-DEDUP-AUDIT.md).
+**Phase 12 handoff (12-01 → 12-02):** Config layer complete: `partnerPostback` is a DestinationName; `IPartnerPostbackConfig` (registrationUrl/conversionUrl/enabled); `PartnerPostbackConfigSchema` (disabled+empty defaults); matrix column (true: signup_completed/purchase_completed/pap_payment_completed; false: all free/$0 events); PUT validation accepts partnerPostback block. Plan 12-02 builds `destinations/partner-postback.ts` (GET + macro substitution), reads per-brand config from `TrackingSettings.destinations.partnerPostback`, gates CONVERSION send on `isFirstPurchase===true` (FTD once-per-user). Dispatcher already routes to partnerPostback via the column added in 12-01.
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████░░░░] 67% (6/9 plans)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [███████░░░] 78% (7/9 plans)
 
 **Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT).
 
@@ -39,7 +39,13 @@ Progress: v1.0 [██████████] 100% (10/10) · v1.1 [███�
 
 ### Decisions
 
-Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (11-03 additions):
+Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (12-01 additions):
+- No Trading Cult URLs hardcoded in config defaults — registrationUrl/conversionUrl default to empty string; set via PUT /api/tracking/settings post-deploy (brand-neutral config)
+- partnerPostback: false for all free_trial_signup/free_challenge_signup/pap_free_signup — $0 events must not fire S2S conversion postback (fraud-filter risk); registration signal from signup_completed: true
+- No toJSON masking for partnerPostback URLs — URL templates are not credentials (unlike webhookSecret/accessToken)
+- 4-file atomic commit pattern for new destination: DESTINATIONS tuple + interface + model sub-schema + validation block must ship together or TS types are inconsistent
+
+v1.3 locked decisions (11-03 additions):
 - ConversionWebhookEventsService event surface {ChallengePassed,ChallengeFailed,PayoutCompleted,KYCCompleted,AccountFunded,dispatchFromWorker} is disjoint from Tracking path events {signup_completed,purchase_completed,pap_payment_completed} — confirmed by live grep at post-11-02 HEAD; no guard or refactor needed (CRM-08 closed)
 - deterministicEventId is minute-bucketed (Math.floor(ts/60000)) — safe only for browser<>server same-minute dedup; gateway webhook retries a minute+ later need explicit stable eventIds
 - Phase 11 stable eventId scheme (signup:<userId>, purchase:<paymentId>, pap:<paymentId>) satisfies CRM-08 cross-minute idempotency requirement
@@ -94,5 +100,5 @@ v1.3 base locked decisions:
 ## Session Continuity
 
 Last session: 2026-07-01
-Stopped at: 11-03 complete — CRM-08 dual-path audit written (8540f5a). Confirmed disjoint event surfaces, stable eventId dedup, minute-bucket caveat. Phase 11 fully complete. Ready for Phase 12 (partnerPostback adapter).
-Resume file: .planning/phases/12-partner-postback/ (Phase 12 plan)
+Stopped at: 12-01 complete — partnerPostback config layer (702b312f). DESTINATIONS + IPartnerPostbackConfig + schema + validation + matrix column. All verify checks pass (grep 3/35, tsc 0 errors).
+Resume file: .planning/phases/12-partner-postback-adapter/12-02-PLAN.md (adapter implementation)
