@@ -115,12 +115,14 @@ Plans:
 4. A `partnerClickId` value containing URL-special characters (e.g. `+`, `=`, `/`) is correctly `encodeURIComponent`-ed before substitution — the partner receives the exact original value.
 5. [POST-DEPLOY CHECKPOINT — deferred] Trading Cult live traffic: a test registration via a partner tracking link produces a delivery-log entry with `status: "sent"` and the partner's tracking system shows the registration event.
 
-**Plans:** TBD
+**Plans:** 3 plans (12-01 config in Wave 1; 12-02 adapter+register in Wave 2 depends on 12-01 types; 12-03 verify + deferred live checkpoint in Wave 3)
 
 Plans:
-- [ ] 12-01: `TrackingSettings.destinations.partnerPostback` config shape + model + interface (CRM-09) + Trading Cult DB seed
-- [ ] 12-02: `destinations/partner-postback.ts` adapter — GET fetch, `expandMacros()`, `encodeURIComponent`, skip guards (incl. `isFirstPurchase` gate for conversion), delivery log, fire-and-forget wrapper (CRM-07)
-- [ ] 12-03: Register adapter + end-to-end integration verify (registration postback + conversion postback + URL-special-char clickid test)
+- [ ] 12-01-PLAN.md — partnerPostback destination config: DESTINATIONS tuple + `IPartnerPostbackConfig` + `ITrackingSettings.destinations.partnerPostback` + mongoose sub-schema (disabled+empty defaults) + PUT-settings validation block + `partnerPostback` matrix column (true only for signup_completed/purchase_completed/pap_payment_completed) (CRM-09) — [wave 1]
+- [ ] 12-02-PLAN.md — `destinations/partner-postback.ts` GET adapter (skip-guards + FTD `isFirstPurchase` gate + macro substitution w/ encode-once + AbortSignal.timeout(15000) + one 5xx retry + never-throw) and `registerAdapter(partnerPostbackAdapter)` (CRM-07) — [wave 2, depends 12-01]
+- [ ] 12-03-VERIFY — behavioral verification harness (10 cases: skip-guards, FTD gate, registration/conversion GET shapes, encode-once round-trip, 5xx retry) + whole-chain tsc + DEFERRED post-deploy live Trading Cult checkpoint (SC5) — [wave 3, depends 12-02]
+
+Note: Trading Cult's real registration/conversion URL templates are set at config time via `PUT /api/tracking/settings` AFTER deploy (external partner-spec dependency) — not hardcoded, not a code plan.
 
 ## Progress
 
@@ -138,4 +140,4 @@ Plans:
 | 9. PAP Funded Queue State Label | v1.2 | 1/1 | ✓ Complete (human-verify pending deploy) | 2026-07-01 |
 | 10. Capture & Persist | v1.3 | 3/4 | ✓ Complete (code; 10-04 human-verify pending deploy) | 2026-07-01 |
 | 11. Wire Emits + Dedup | v1.3 | 3/3 | ✓ Complete (code; live event-firing verify post-deploy) | 2026-07-01 |
-| 12. partnerPostback Adapter + Config + Verify | v1.3 | 0/3 | Not started | - |
+| 12. partnerPostback Adapter + Config + Verify | v1.3 | 0/3 | Planned | - |
