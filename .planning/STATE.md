@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 ## Current Position
 
 Phase: 10 of 12 (Capture & Persist)
-Plan: —
-Status: Roadmap complete — Phase 10 ready to plan
-Last activity: 2026-07-01 — v1.3 roadmap created (Phases 10-12); Phase 10 ready to plan
+Plan: 1 of 3 in Phase 10
+Status: In progress
+Last activity: 2026-07-01 — Completed 10-01-PLAN.md (CRM-01 cookie capture + signup forward)
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [░░░░░░░░░░] 0% (0/9 plans)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [█░░░░░░░░░] 11% (1/9 plans)
 
 **Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT).
 
@@ -37,7 +37,14 @@ Progress: v1.0 [██████████] 100% (10/10) · v1.1 [███�
 
 ### Decisions
 
-Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions:
+Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions (10-01 additions):
+- `_partner_clickid` cookie: `httpOnly:false` (required so js-cookie browser-side can read it for signup forward)
+- Raw-value passthrough contract: backend `/track` sets raw, dashboard forwards raw, Phase 12 encodes once at S2S send
+- Open-redirect guard on `?redirect=`: must start with `/` but NOT `//` (blocks protocol-relative hijack)
+- `trackRedirect` is sync (no async/DB); error path still 302-redirects to `/` — tracking never breaks a landing click
+- Skip-when-absent on dashboard: `...(partnerClickId ? { partnerClickId } : {})` — empty string never sent
+
+v1.3 base locked decisions:
 - Conversion = FTD only (one postback per acquired user, not per purchase)
 - Payout = `usdAmount` with `currency=USD` always (guards JPY-as-USD bug class)
 - PAP purchases count as conversions — `pap_payment_completed` path must be wired
@@ -58,5 +65,5 @@ Full decision log in PROJECT.md Key Decisions table. v1.3 locked decisions:
 ## Session Continuity
 
 Last session: 2026-07-01
-Stopped at: v1.3 roadmap created — Phases 10-12 defined, REQUIREMENTS.md traceability filled, STATE.md updated. Ready to run `/gsd:plan-phase 10`.
-Resume file: None. Next action: `/gsd:plan-phase 10`
+Stopped at: 10-01 complete — CRM-01 backend `/track` route + dashboard signup forward pushed to main-2026 (both repos). Ready for 10-02 (schema/persist).
+Resume file: .planning/phases/10-capture-persist/10-02-PLAN.md (next plan to execute)
