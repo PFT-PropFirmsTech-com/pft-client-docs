@@ -2,17 +2,17 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-01)
+See: .planning/PROJECT.md (updated 2026-07-03)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state. External affiliate partners attribute registrations and conversions via S2S postbacks.
-**Current focus:** Planning next milestone (v1.3 complete). Candidates: v1.4 margin-history enhancement (queued, research-shaped) or the Funding Optimal free-trial ops todo (blocked on client).
+**Current focus:** v1.4 Klaviyo purchase-coverage fix (ticket cmqtl47g4004zny0kz54mmz0z) — defining requirements.
 
 ## Current Position
 
-Phase: — (v1.3 milestone complete; no active phase)
-Plan: Not started
-Status: v1.3 milestone complete — archived, tagged. Ready to plan next milestone via `/gsd:new-milestone`.
-Last activity: 2026-07-01 — v1.3 "CRM Partner Tracking (S2S Postbacks)" (Phases 10-12) complete
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-03 — Milestone v1.4 Klaviyo Purchase-Coverage Fix started
 
 Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████████] 100% (9/9 plans, code-complete + code-level verified)
 
