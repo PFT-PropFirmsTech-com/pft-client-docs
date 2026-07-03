@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-07-03)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state. External affiliate partners attribute registrations and conversions via S2S postbacks. Every purchase-flow outcome (not just completed) reaches Klaviyo.
-**Current focus:** v1.4 Klaviyo purchase-coverage fix — Phase 13 (Purchase-Failure Tracking Wiring), Plan 01 of 3 complete (foundation util + adapter fix), Plans 02/03 (call-site wiring) remain.
+**Current focus:** v1.4 Klaviyo purchase-coverage fix — Phase 13 (Purchase-Failure Tracking Wiring), Plans 01/02 of 3 complete (foundation util + cron/generic-callback wiring), Plan 03 (Stripe + FanBasis wiring) in progress in parallel.
 
 ## Current Position
 
 Phase: 13 of 13 (Purchase-Failure Tracking Wiring)
-Plan: 01 of 3
+Plan: 02 of 3
 Status: In progress
-Last activity: 2026-07-03 — Completed 13-01-PLAN.md (emitTrackingPurchaseFailed util + purchaseFailed helper/Klaviyo adapter fix)
+Last activity: 2026-07-03 — Completed 13-02-PLAN.md (purchase_failed wired into hourly expiry cron + generic NOWPayments/Paysafe callback handler)
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████████] 100% (9/9 plans, code-complete + code-level verified) · v1.4 [███░░░░░░░] 33% (1/3)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████████] 100% (9/9 plans, code-complete + code-level verified) · v1.4 [██████░░░░] 67% (2/3)
 
 **Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT) + v1.3: Phase 10 (10-04, full capture→persist path) + Phase 12 (SC5, live Trading Cult postback — ALSO needs Trading Cult's real registrationUrl/conversionUrl configured via `PUT /api/tracking/settings`, not just a deploy).
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 34 (v1.0: 10, v1.1: 4, v1.2: 7 [Phases 4.1/5/6/7/8/9], v1.3: 9 [10-01/02/03, 11-01/02/03, 12-01/02/03], v1.4: 1 [13-01])
+- Total plans completed: 35 (v1.0: 10, v1.1: 4, v1.2: 7 [Phases 4.1/5/6/7/8/9], v1.3: 9 [10-01/02/03, 11-01/02/03, 12-01/02/03], v1.4: 2 [13-01, 13-02])
 - Average duration: ~6 min
 
 **By Milestone:**
@@ -32,7 +32,7 @@ Progress: v1.0 [██████████] 100% (10/10) · v1.1 [███�
 | v1.1 | 4 | 4 | ~28 min | ~7 min |
 | v1.2 | 4.1, 5-9 | 7 | ~40 min | ~5 min |
 | v1.3 | 10-12 | 9 | ~2h50m | ~8 min (incl. research + 3 verify cycles) |
-| v1.4 | 13 | TBD | 12 min so far (1 plan) | ~12 min |
+| v1.4 | 13 | TBD | 20 min so far (2 plans) | ~10 min |
 
 ## Accumulated Context
 
@@ -62,5 +62,5 @@ Full decision log in PROJECT.md Key Decisions table. Locked conventions carried 
 ## Session Continuity
 
 Last session: 2026-07-03
-Stopped at: Completed 13-01-PLAN.md (emitTrackingPurchaseFailed util + purchaseFailed helper/Klaviyo adapter fix). Plans 13-02/13-03 (call-site wiring) remain.
-Resume file: .planning/phases/13-purchase-failure-tracking-wiring/13-02-PLAN.md. Next action: `/gsd:execute-phase 13`.
+Stopped at: Completed 13-02-PLAN.md (purchase_failed wired into hourly expiry cron + generic NOWPayments/Paysafe callback handler). Plan 13-03 (Stripe + FanBasis wiring) ran in parallel — check for 13-03-SUMMARY.md before resuming.
+Resume file: .planning/phases/13-purchase-failure-tracking-wiring/13-03-PLAN.md (if not yet summarized). Next action: `/gsd:execute-phase 13` or verify 13-03 completion directly.
