@@ -1,235 +1,194 @@
-# Stack Research: v1.3 CRM Partner Tracking (S2S Postbacks)
+# Stack Research: v1.4 Klaviyo Purchase-Failure Coverage Gap
 
-**Domain:** S2S postback firing + partner click-ID capture — extension of existing white-label prop-trading backend
-**Researched:** 2026-07-01
-**Confidence:** HIGH — all findings from direct file reads of the live codebase; zero training-data assumptions
-
----
-
-## Executive Finding: Zero New Dependencies Required
-
-Every building block needed for S2S GET postbacks with macro substitution already exists in the codebase. The work is purely additive TypeScript inside the existing module tree. No `npm install` required.
+**Domain:** Wiring a missing tracking-event call into an existing dispatch framework — bugfix/coverage milestone on an existing white-label prop-trading backend
+**Researched:** 2026-07-03
+**Confidence:** HIGH — all findings from direct file reads of the live codebase (pft-backend, branch `main-2026`); zero training-data assumptions
 
 ---
 
-## HTTP Client Already in Use
+## Executive Finding: Zero New Dependencies, Zero Catalog Changes — Pure Call-Site Wiring
 
-**Client: native `fetch` (Node.js built-in, no package)**
+The entire `purchase_failed` event — catalog entry, per-destination default toggle, Klaviyo metric name mapping, GA4/Meta mapping, and a fully-typed `TrackingEvents.purchaseFailed()` helper — **already exists and is dead code**. It has **zero real callers** anywhere in the repo. This exactly mirrors the v1.3 finding for `signupCompleted`/`purchaseCompleted` (helper built, call sites not wired at every completion path) — the same defect class, now on the failure side of the funnel.
 
-Evidence — `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.service.ts` line 148:
+No new library, schema field, dispatcher route, or adapter change is needed. This is purely: call `TrackingEvents.purchaseFailed(...)` (or a new small wrapper util that mirrors the existing `emitTrackingPurchaseCompleted` pattern) from the payment-gateway code paths that currently flip `Payment.status` to `"failed" | "expired" | "cancelled"` without ever notifying the Tracking module.
 
-```typescript
-const response = await fetch(webhookUrl, {
-  method: "POST",
-  headers,
-  body,
-  signal: AbortSignal.timeout(15000),
-});
+---
+
+## What Already Exists (DO NOT REBUILD)
+
+### 1. Event catalog entry — `purchase_failed` is fully defined
+
+File: `pft-backend/src/app/modules/Tracking/tracking.interface.ts:20`
+`"purchase_failed"` is a member of `EVENT_NAMES` / `EventName` — the same union type the dispatcher, Mongoose schema (`eventName: { enum: EVENT_NAMES } `), and every adapter key off of. Nothing to add here.
+
+### 2. Default per-destination toggle map — already has Klaviyo ON by default
+
+File: `pft-backend/src/app/modules/Tracking/tracking.constants.ts:42`
+```ts
+purchase_failed: { metaCapi: false, googleAds: false, ga4: true, klaviyo: true, conversionWebhook: false, getResponse: false, intercom: false, partnerPostback: false },
+```
+Klaviyo is `true` by default for `purchase_failed`. This is exactly the UI checkbox the ticket screenshot shows under "Purchase funnel" — it is not a dead config key, it's a live default that simply has never been triggered because nothing calls `dispatch()` with `eventName: "purchase_failed"` in production code.
+
+### 3. Event name mapping (GA4 / Meta / Klaviyo) — already defined
+
+File: `pft-backend/src/app/modules/Tracking/tracking.constants.ts:122`
+```ts
+purchase_failed: { ga4: "purchase_failed", fbEvent: "PurchaseFailed", fbStandard: false, klaviyo: "Purchase Failed" },
+```
+Klaviyo metric name `"Purchase Failed"` is already the mapped value the adapter will send. No new metric name needs to be invented or approved with the client — it is baked into shipped code from Phase 10-12 (v1.3).
+
+### 4. Typed helper — already built, has an `errorCode` field, zero callers
+
+File: `pft-backend/src/app/modules/Tracking/tracking.events.service.ts:96-105`
+```ts
+purchaseFailed(args: {
+  userId?: string;
+  email?: string;
+  invoiceId?: string;
+  value?: number;
+  currency?: string;
+  errorCode?: string;
+}, req?: Request) {
+  fire("purchase_failed", args, req);
+},
+```
+Confirmed via repo-wide grep: `TrackingEvents.purchaseFailed` and the raw string `"purchase_failed"` appear **only** inside the Tracking module's own definition files (`tracking.constants.ts`, `tracking.events.service.ts`, `tracking.interface.ts`, `tracking.validation.ts`). No `.ts` file outside the Tracking module invokes it. This is the confirmed dead-helper finding the quality gate asked about — same shape as the v1.3 `signupCompleted`/`purchaseCompleted` pre-wiring gap.
+
+### 5. Klaviyo adapter — fully event-name-generic, no per-event code
+
+File: `pft-backend/src/app/modules/Tracking/destinations/klaviyo.ts`
+The adapter looks up `EVENT_MAPPING[payload.eventName]?.klaviyo` (line 66) and sends whatever metric name comes back. There is no `if (eventName === "purchase_completed")` special-casing anywhere in this file — it already handles `purchase_failed` correctly the instant the dispatcher is called with that event name. **Do not touch this file.**
+
+### 6. Dispatcher (`tracking.service.ts`) — fully generic, no event-name branching
+
+Confirmed via grep: no `switch`/`if (eventName === ...)` logic keyed on specific event names in the dispatch path. It routes any `EventName` through the per-destination toggle map from `tracking.constants.ts`. **Do not touch this file.**
+
+### 7. Reference pattern to mirror — `emitTrackingPurchaseCompleted`
+
+File: `pft-backend/src/app/modules/Payment/utils/trackingPurchaseEmit.ts`
+This is the existing wrapper util that gateway/webhook services import and call fire-and-forget after flipping `payment.status = "completed"`. It:
+- Takes a loosely-typed `PaymentLike` (works with hydrated Mongoose docs across all gateways)
+- Reads `usdAmount`, `billingInfo.email`, `programId`, `accountSize`, `challengeType`, `paymentMethod`, `invoice`, `attribution.partnerClickId` off the Payment doc
+- Wraps the whole thing in try/catch so tracking failures never break payment flow
+- Uses a stable `eventId` (`purchase:<paymentId>`) for dedup
+
+**This is the pattern to copy for a new `emitTrackingPurchaseFailed(payment, reason?)` util**, not a from-scratch design. Same file conventions, same defensive try/catch, same "fire-and-forget, swallow everything" contract.
+
+---
+
+## What's Actually Missing: The Call Sites (this IS the v1.4 work)
+
+`Payment.status` enum (confirmed at `pft-backend/src/app/modules/Payment/payment.model.ts:109` / `payment.interface.ts:109`):
+```ts
+status: "pending" | "completed" | "failed" | "cancelled" | "expired" | "partially_paid" | "processing" | "capturing"
 ```
 
-`axios` is present in `pft-backend/package.json` (`"axios": "^1.9.0"`) but it is NOT imported anywhere in the Tracking or ConversionWebhook module trees. Do not introduce `axios` into this path. Use native `fetch` + `AbortSignal.timeout(15000)` for the GET postback call — same timeout pattern, same error-handling shape (`ok`, `statusCode`, `error`, `durationMs` return).
+Every place `status` is set to `"failed"`, `"expired"`, or `"cancelled"` was enumerated. They fall into two buckets:
+
+### Bucket A — genuine customer-facing purchase failures (NEED the new tracking call)
+
+| File | Line(s) | Gateway | What happens | Tracking call today |
+|------|---------|---------|---------------|----------------------|
+| `Payment/services/stripe-webhook.service.ts` | 344 `handleCheckoutSessionExpired` | Stripe | `checkout.session.expired` webhook → `payment.status = "expired"` (line 376) | **None** |
+| `Payment/services/stripe-webhook.service.ts` | 304 `handlePaymentIntentFailed` | Stripe | `payment_intent.payment_failed` webhook → `payment.status = "failed"` (line 325) | **None** |
+| `Payment/services/stripe-webhook.service.ts` | 103, 132, 245, 272, 325 | Stripe | Security-check failures (currency/amount mismatch) inline → `status = "failed"` | **None** |
+| `Payment/services/fanbasis-webhook.service.ts` | `handlePaymentFailed` (~418-423) | Fanbasis | `status = "failed"` | **None** |
+| `Payment/services/fanbasis-webhook.service.ts` | `handlePaymentExpired` (~435-440) | Fanbasis | `status = "expired"` | **None** |
+| `Payment/services/fanbasis-webhook.service.ts` | `handlePaymentCanceled` (~445-450) | Fanbasis | `status = "cancelled"` | **None** |
+| `Payment/services/fanbasis-webhook.service.ts` | `handlePaymentSuccess` amount/currency mismatch (~309, 325) | Fanbasis | Security-check failure → `status = "failed"` | **None** |
+| `Payment/services/callback.service.ts` | `handleNonCompletedPayment` (line 805) | NOWPayments/crypto/generic callback | Already branches on `status === "failed" \|\| status === "expired"` and calls `sendPaymentStatusNotification` (line 809-811) | **None** — this is the single cleanest choke point, already invoked for every non-completed terminal status in this gateway's flow |
+| `Payment/services/paypal-webhook.service.ts` | lines 272, 287, 349, 440, 455, 534, 641, 656 | PayPal | Multiple inline `payment.status = "failed"` on capture/verification failure | **None** |
+
+**Highest-priority fix for the Trading Cult ticket:** `stripe-webhook.service.ts::handleCheckoutSessionExpired` (line 344-386). Trading Cult's complaint is specifically an **EXPIRED** purchase not reaching Klaviyo, and Stripe Checkout is the standard card-payment gateway; `checkout.session.expired` is the canonical "customer abandoned checkout" event. Confirm Trading Cult's active gateway via its `PaymentConfig` doc before assuming Stripe-only, but this handler is the most direct match to the reported symptom.
+
+**Second-priority:** `callback.service.ts::handleNonCompletedPayment` (line 805) — this is a single function already called for both `"failed"` and `"expired"` on the crypto/generic-callback gateway path, making it the cheapest single-call-site fix per gateway (one call covers two statuses at once, exactly like the existing `sendPaymentStatusNotification` call it sits next to).
+
+### Bucket B — internal/idempotency housekeeping, NOT customer-facing failures (do NOT wire tracking here)
+
+| File | Line | What it actually is |
+|------|------|----------------------|
+| `Payment/payment.service.modular.ts:1224` | Rollback of an orphaned `pending` row when gateway session creation itself throws before any checkout UI was shown to the user | No real purchase attempt reached the customer — firing `purchase_failed` here would be noise |
+| `Payment/payment.service.modular.ts:1318` | Coupon-usage-limit race: `processing → failed` reset inside a `catch` on a concurrent free-payment coupon claim | Internal concurrency guard, not a gateway-reported failure |
+| `Payment/payment.service.modular.ts:1451` | PAP funded-leg sibling-request dedup: marks a duplicate in-flight attempt `"expired"` after a sibling request already completed the same funded provisioning | Superseded duplicate, not a failed purchase — the sibling's `purchase_completed` (or `pap_payment_completed`) already fired |
+| `Payment/payment.service.modular.ts:1564` | Free-payment `processing → failed` reset in the outer catch after `processFreePayment` throws | Same as 1318 — internal reset so retries aren't blocked |
+| `Payment/payment.service.modular.ts:2704` | Free $0-PAP stale pending/processing rows superseded by a new attempt (crash recovery) | Explicitly "supersede stale attempts to allow retry" — not a terminal customer failure |
+
+These five sites should be left alone. Wiring `purchase_failed` into them would fire false-positive "purchase failed" emails/flows in Klaviyo for cases that are actually internal retries or already-successful duplicate-request cleanup — a new bug class, not a fix.
 
 ---
 
-## Macro/Template Substitution
+## Recommended Implementation Shape
 
-**Approach: inline `String.prototype.replace()` — no new dependency**
+### New util (mirror `trackingPurchaseEmit.ts`)
 
-`sprintf-js` (`"sprintf-js": "^1.1.3"`) is in `package.json` but is not used anywhere in the Tracking or ConversionWebhook modules. Do not pull it in. The S2S GET URL template format uses curly-brace tokens (`{clickid}`, `{goal}`, `{payout}`), not `%s` printf syntax. The correct implementation is a two-line inline helper:
+Create `pft-backend/src/app/modules/Payment/utils/trackingPurchaseFailedEmit.ts` exporting `emitTrackingPurchaseFailed(payment, errorCode?)`:
+- Same `PaymentLike` shape as the completed-emit util (reuse/import if convenient, or duplicate the same minimal interface — the existing file already documents that it intentionally avoids coupling to the full `IPayment` type)
+- Calls `TrackingEvents.purchaseFailed({ userId, email, invoiceId, value, currency, errorCode })` — the helper signature already supports exactly these fields, no interface change needed
+- Wrap in try/catch, fire-and-forget (`void emitTrackingPurchaseFailed(payment, ...)`), matching the `emitTrackingPurchaseCompleted` contract exactly
+- No `eventId` dedup requirement was specified for `purchase_failed` in the existing helper signature (unlike `purchaseCompleted`/`papPaymentCompleted` which take an `eventId` for retry-safe dedup) — if gateways can re-send failure webhooks (Stripe/PayPal retry on non-2xx), consider whether the dispatcher's existing minute-bucketed `deterministicEventId` fallback is sufficient, or whether `errorCode`-bearing helper should also accept an optional `eventId` for parity. This is a design call for planning, not a blocker — the field is easy to add to the existing helper args object since it's a plain object literal, not a rigid schema.
 
-```typescript
-// Lives inside the new adapter/helper file — no import needed
-function expandMacros(
-  urlTemplate: string,
-  vars: { clickid: string; goal: string; payout: string }
-): string {
-  return urlTemplate
-    .replace("{clickid}", encodeURIComponent(vars.clickid))
-    .replace("{goal}", encodeURIComponent(vars.goal))
-    .replace("{payout}", encodeURIComponent(vars.payout));
-}
-```
+### Call sites to add (Bucket A only)
 
-Partner postback URL example: `https://partner.example.com/postback?clickid={clickid}&goal={goal}&payout={payout}`. Curly-brace tokens are unambiguous (not valid URL characters in path/query values) and safe to replace with a single-pass `.replace()`.
+1. `stripe-webhook.service.ts::handleCheckoutSessionExpired` — after `payment.status = "expired"; await payment.save();` (line 376-377)
+2. `stripe-webhook.service.ts::handlePaymentIntentFailed` — after `payment.status = "failed"; await payment.save();` (line 325-326)
+3. `stripe-webhook.service.ts` inline security-check failures (lines 103, 132, 245, 272) — same pattern, each already has `payment.status = "failed"; await payment.save();` immediately followed by `return`
+4. `fanbasis-webhook.service.ts::handlePaymentFailed`, `handlePaymentExpired`, `handlePaymentCanceled` — one call each, after the existing `await payment.save()`
+5. `callback.service.ts::handleNonCompletedPayment` (line 805-812) — single call inside the existing `if (status === "failed" || status === "expired")` branch, right next to the existing `sendPaymentStatusNotification` call
+6. `paypal-webhook.service.ts` — the 8 inline `payment.status = "failed"` sites
 
----
+### What NOT to touch
 
-## Recommended Stack (Additive Only)
-
-### Core Technologies — No Changes
-
-| Technology | Version in package.json | Role in S2S postbacks | Why |
-|------------|------------------------|----------------------|-----|
-| Node.js built-in `fetch` | Runtime >=20.9.0 (already enforced via `engines` in package.json) | GET postback HTTP call | Already the HTTP client used by `deliverPayload()` at line 148; zero new dep |
-| TypeScript | `^5.9.2` | New adapter file + model field additions | Existing language |
-| Mongoose | `^8.4.4` | `partnerClickId` field on User schema; optional postback config fields on `ConversionWebhookSettings` | Schema-flexible; no migration script required |
-| `AbortSignal.timeout()` | Node 20+ built-in | 15-second hard timeout on GET | Same pattern as `conversion-webhook.service.ts` line 152 |
-
-### Supporting Libraries — Already Present, No New Installs
-
-| Library | package.json version | Use in S2S | Notes |
-|---------|---------------------|------------|-------|
-| `winston` (via `logger`) | `^3.17.0` | Log failed postbacks via `logger.warn` / `logger.error` | Same import used throughout all modules |
-| `zod` | `^3.23.8` | Validate any new config fields in admin update endpoint | Already used for validation schemas in this codebase |
-| `crypto` (Node built-in) | package.json entry `"crypto": "^1.0.1"` wraps built-in | Not needed — S2S GET postbacks require no signature headers | Contrast: existing `conversionWebhook` POST uses HMAC; GET postbacks don't |
+- `tracking.service.ts` (dispatcher) — already fully generic
+- `tracking.constants.ts` — catalog/mapping/defaults already complete for `purchase_failed`
+- `destinations/klaviyo.ts` — already event-name-agnostic
+- `tracking.events.service.ts` — `purchaseFailed()` helper already exists with the right field shape (only touch if adding an optional `eventId` param for dedup parity, additive-only)
+- Payment/service.modular.ts Bucket-B internal housekeeping status flips (see above — false-positive risk)
+- Super-admin per-brand destinations config UI/schema — the `purchase_failed` checkbox already exists per the ticket screenshot; this is a backend call-site gap, not a config-schema gap
 
 ---
 
 ## Installation
 
-```bash
-# No new packages. Zero npm/yarn installs required.
-```
-
----
-
-## Reusable Building Blocks
-
-### 1. `IDestinationAdapter` interface
-**`pft-backend/src/app/modules/Tracking/destinations/base.ts` lines 27–37**
-
-`send(payload, ctx): Promise<IDispatchResult>` is the correct extension point. A new file `destinations/partner-postback.ts` implementing this interface is registered via `registerAdapter()` in `destinations/index.ts` (follows the pattern at lines 14–18). No changes to the central dispatcher.
-
-### 2. `ConversionWebhookService.deliverPayload()` — pattern to clone, not call
-**`conversion-webhook.service.ts` lines 113–171**
-
-Shows the full pattern: build URL, call `fetch` with `AbortSignal.timeout`, capture `{ ok, statusCode, error, durationMs }`. The new S2S GET postback helper replicates this shape for a GET request (no body, no Content-Type header). Do NOT call `deliverPayload()` itself — it always POSTs JSON and always reads the stored `webhookUrl`, neither of which applies.
-
-### 3. `dispatchConversionWebhook()` fire-and-forget wrapper
-**`conversion-webhook.dispatch.ts` lines 5–13**
-
-```typescript
-export function dispatchConversionWebhook(input): void {
-  ConversionWebhookService.dispatch(input).catch((err) => {
-    logger.error("Conversion webhook dispatch error", { ... });
-  });
-}
-```
-
-Replicate this fire-and-forget `.catch()` pattern for the new postback calls. S2S failures must never propagate to the caller.
-
-### 4. `TrackingEvents` event helpers — the two call sites
-**`tracking.events.service.ts` lines 38–39 (`signupCompleted`) and 62–75 (`purchaseCompleted`)**
-
-These are the correct places to add the S2S registration and sale postback fires respectively. Both already exist and route through the Tracking dispatcher to all destinations. The simplest implementation invokes the postback directly from these helpers rather than adding a new `DestinationName` entry (see Alternatives below).
-
-### 5. Per-brand config — `ConversionWebhookSettings` schema
-**`conversion-webhook.model.ts` lines 18–35**
-
-Add optional partner postback fields directly to the existing schema:
-- `partnerPostbackEnabled: { type: Boolean, default: false }`
-- `registrationPostbackUrl: { type: String, default: "" }`
-- `salePostbackUrl: { type: String, default: "" }`
-
-This avoids a new collection and new admin UI surface. For the v1.3 one-partner MVP, config can be seeded directly into the DB or via env vars without admin UI.
-
-### 6. `ConversionWebhookDeliveryLog` — reuse for postback delivery logs
-**`conversion-webhook.model.ts` lines 50–73**
-
-TTL-indexed collection (30-day auto-expiry). Reuse by writing partner postback delivery records with synthetic event names `"PartnerRegistration"` and `"PartnerSale"`. Same `{ ok, statusCode, error, durationMs }` struct maps directly.
-
----
-
-## `partnerClickId` Capture Path
-
-### What is NOT already there
-`enrichment/click-ids.ts` captures `fbclid`, `gclid`, `ttclid`, `msclkid`, `li_fat_id` for ad platforms only. There is no `clickid` query parameter handling anywhere in the codebase. The `TRegisterUser` interface (`auth.interface.ts` line 320) has no attribution or partner-click fields. The User Mongoose schema (`auth.model.ts`) has no `partnerClickId`, `utmSource`, or similar attribution storage.
-
-### What must be added (minimal surface)
-
-**User model** (`auth.model.ts`, near `referralCode` at line 479):
-```typescript
-partnerClickId: { type: String },
-```
-
-**Registration interface** (`auth.interface.ts`, `TRegisterUser` at line 320):
-```typescript
-partnerClickId?: string;
-```
-
-**Auth service** (`auth.service.ts`, `initiateRegistration()` user-create block): persist `partnerClickId` from `req.body` to the new user document field.
-
-**Tracking payload** (`tracking.interface.ts`, `ITrackingEventPayload` at line 168):
-```typescript
-partnerClickId?: string;
-```
-
-**Do NOT modify** `enrichment/click-ids.ts` — its purpose is ad-platform-specific cookie formats. `partnerClickId` is a plain query string captured once at signup and persisted, not enriched from cookies on every event.
-
-The `partnerClickId` lookup flow at postback time: read from User document by `userId` (one `User.findById().select('partnerClickId')` call inside the postback adapter), not from live request context.
-
----
+No new packages. No `npm install` required — every dependency (native `fetch`, Mongoose, the Tracking module itself) is already in place and unchanged by this milestone.
 
 ## Alternatives Considered
 
 | Recommended | Alternative | Why Not |
-|-------------|-------------|---------|
-| Native `fetch` for GET call | `axios` (already in package.json) | `axios` is not used in this module tree; importing it creates inconsistency and adds an unnecessary dep boundary. Native `fetch` with `AbortSignal.timeout` is the established pattern in this code. |
-| Inline `String.replace()` for macro substitution | `sprintf-js` (already in package.json) | `sprintf-js` uses `%s` printf syntax, not `{key}` curly-brace syntax. Adapting it adds more code than the two-line replace. No benefit. |
-| Direct fire from `TrackingEvents` helpers | New `DestinationName` + `IDestinationAdapter` registered in the dispatcher | A full adapter adds Tracking settings DB toggles, dedup index, delivery log via the dispatcher, and a new `DestinationName` literal. For one partner with no admin toggle UI yet, the overhead is unjustified. Use a direct fire with its own try/catch and delivery log write. Promote to a full adapter when multi-partner UI is built. |
-| Add postback config fields to existing `ConversionWebhookSettings` | New `PartnerPostbackSettings` collection | One additional collection means one more DB query path, a new model file, a new service, and eventually new admin UI. Unnecessary for one-partner MVP scope. |
-| No retry on GET failure | Retry with exponential backoff | S2S postbacks are best-effort by industry convention. Partners do not expect guaranteed delivery. Retry risks duplicate conversion credits on the partner side. Log and move on (same as existing `conversionWebhook` behavior). |
+|---|---|---|
+| Small `emitTrackingPurchaseFailed` util mirroring the existing completed-emit pattern, called from each gateway's failure handler | Add the tracking call inline at each of the ~15 status-flip sites without a shared util | Duplicates the email/value/currency field-extraction logic 6+ times across gateways; the existing codebase convention (proven by `trackingPurchaseEmit.ts`) is a single shared emit util per event type, imported by each gateway service |
+| Wire only Bucket A (genuine customer failures) | Wire tracking at every `status = "failed"/"expired"/"cancelled"` site including internal housekeeping (Bucket B) | Would fire spurious `purchase_failed` events (and Klaviyo flows/emails) for internal retry resets and superseded-duplicate cleanup that were never customer-visible failures |
+| Reuse the existing `purchase_failed` event name/catalog entry | Introduce a new event name (e.g. `purchase_expired` distinct from `purchase_failed`) | The catalog, Klaviyo mapping, and default toggles were already built in v1.3 around a single `purchase_failed` covering failed/expired/cancelled outcomes uniformly (mirrors `errorCode` as the differentiator field, not separate event types) — inventing a second event type would require new catalog/mapping/toggle entries the ticket's UI screenshot doesn't show existing, and isn't necessary since `errorCode` can carry `"expired"`/`"cancelled"`/`"failed"` as the differentiator |
 
----
-
-## What NOT to Add
+## What NOT to Use
 
 | Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| `axios` for the GET postback | Inconsistency — `conversionWebhook` already uses native `fetch`; mixing clients in the same module confuses future readers | `fetch` + `AbortSignal.timeout(15000)` |
-| `node-fetch` or any fetch polyfill | Node runtime is already pinned to >=20.9.0 which ships native `fetch` | Native `fetch` |
-| `sprintf-js` for URL macro substitution | Wrong token syntax for curly-brace S2S format; a two-line `replace()` is simpler | Inline `String.prototype.replace()` |
-| New `PartnerPostbackSettings` Mongoose model/collection | Over-engineering for one partner | Add 3 optional fields to `ConversionWebhookSettings` schema |
-| Retry logic with backoff | Risks duplicate conversion credits on partner side; S2S is best-effort | Log failure, write delivery log, return |
-| Admin UI for partner postback config in v1.3 | Scope is a minimal one-off for Trading Cult; building UI adds frontend work not in scope | Env var or direct DB seed for the postback URL templates |
-| Storing `partnerClickId` in a cookie from the backend | Backend has no cookie-write surface at the tracking call sites (service layer, not controller) | Frontend captures `?clickid=` param, sends in registration body; backend persists to User doc |
-| `encodeURIComponent` inside `expandMacros` only | The `clickid` value from the partner may already be URL-encoded by their system — double-encoding corrupts it | Encode only if the value is confirmed raw. Default to encoding once; document the assumption. |
+|---|---|---|
+| Rebuilding the Klaviyo adapter or dispatcher to "support" purchase_failed | They already fully support it — this would be wasted, risky churn on working shipped code | Only add the missing caller-side `emitTrackingPurchaseFailed(...)` invocations |
+| A blanket "wire tracking at every status-flip site" sweep without bucketing | Confirmed 5 internal-housekeeping sites in `payment.service.modular.ts` are not real customer failures | Bucket A/B split above — only touch the 6 gateway webhook files with genuine customer-facing terminal outcomes |
 
----
+## Version Compatibility
 
-## Key Files to Modify or Create
-
-| File | Action | Detail |
-|------|--------|--------|
-| `Auth/auth.interface.ts` | Modify | Add `partnerClickId?: string` to `TRegisterUser` (line 320 block) |
-| `Auth/auth.model.ts` | Modify | Add `partnerClickId: { type: String }` to `UserSchema` (near `referralCode` at line 479) |
-| `Auth/auth.service.ts` | Modify | Persist `partnerClickId` in `initiateRegistration()` user create; add S2S registration postback fire after `verifyRegistrationOtp()` resolves (line 955+ block) |
-| `Tracking/tracking.interface.ts` | Modify | Add `partnerClickId?: string` to `ITrackingEventPayload` (line 168 block) |
-| `Admin/ConversionWebhook/conversion-webhook.model.ts` | Modify | Add 3 optional fields to `conversionWebhookSettingsSchema`: `partnerPostbackEnabled`, `registrationPostbackUrl`, `salePostbackUrl` |
-| `Admin/ConversionWebhook/conversion-webhook.interface.ts` | Modify | Add matching fields to `IConversionWebhookSettings` and `IConversionWebhookSettingsUpdate` |
-| `Admin/ConversionWebhook/partner-postback.ts` | Create | `fetchGetPostback(urlTemplate, vars): Promise<{ok, statusCode, error, durationMs}>` helper; `expandMacros()` inline; delivery log write |
-| `Payment/services/callback.service.ts` or stripe equivalent | Modify | Add S2S sale postback fire-and-forget after purchase confirmed |
-
-**Do NOT modify:**
-- `Tracking/enrichment/click-ids.ts` — ad-platform IDs only
-- `Tracking/destinations/index.ts` — no new adapter registration needed for MVP
-- `Tracking/tracking.service.ts` — central dispatcher is not changed
-
----
+Not applicable — no new packages, no version changes. All work is additive TypeScript within the existing `pft-backend` module tree on `main-2026`.
 
 ## Sources
 
-All HIGH confidence — read directly from live source files, no WebSearch:
-
-- `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.service.ts` — HTTP client (`fetch` line 148), `AbortSignal.timeout` (line 152), timeout value (15000ms), error shape, delivery log pattern
-- `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.dispatch.ts` — fire-and-forget `.catch()` wrapper
-- `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.model.ts` — config schema + delivery log schema with TTL index
-- `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.interface.ts` — payload + settings contracts
-- `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook-events.service.ts` — typed event helper pattern
-- `pft-backend/src/app/modules/Tracking/destinations/base.ts` — `IDestinationAdapter` interface
-- `pft-backend/src/app/modules/Tracking/destinations/conversion-webhook.ts` — adapter implementation example
-- `pft-backend/src/app/modules/Tracking/destinations/index.ts` — adapter registration pattern
-- `pft-backend/src/app/modules/Tracking/tracking.service.ts` — dispatcher, enrichment pipeline, `loadSettings` cache
-- `pft-backend/src/app/modules/Tracking/tracking.events.service.ts` — `signupCompleted` (line 38) + `purchaseCompleted` (line 62) fire sites
-- `pft-backend/src/app/modules/Tracking/tracking.interface.ts` — `ITrackingEventPayload` full field list (confirmed no `partnerClickId` today)
-- `pft-backend/src/app/modules/Tracking/tracking.constants.ts` — `signup_completed` and `purchase_completed` both have `conversionWebhook: true` default
-- `pft-backend/src/app/modules/Tracking/enrichment/click-ids.ts` — confirmed ad-platform only, no generic `clickid` param
-- `pft-backend/src/app/modules/Auth/auth.interface.ts` — `TRegisterUser` (line 320, confirmed no `partnerClickId`)
-- `pft-backend/src/app/modules/Auth/auth.model.ts` — User schema (confirmed no `partnerClickId`, `utmSource`, or attribution fields)
-- `pft-backend/src/app/modules/Auth/auth.service.ts` — `verifyRegistrationOtp()` post-registration block (line 955+) where side effects fire
-- `pft-backend/src/app/modules/Auth/auth.controller.ts` — `req` is available at the register endpoint; `req.body` flows into `initiateRegistration()`
-- `pft-backend/package.json` — confirmed: `fetch` is Node built-in (no package entry); `axios@^1.9.0` present but unused in Tracking/ConversionWebhook; `sprintf-js@^1.1.3` present but unused in these modules; `zod@^3.23.8` and `winston@^3.17.0` available for use
+- Direct file reads, `pft-backend` repo, branch `main-2026` (confirmed via `git branch --show-current`), 2026-07-03:
+  - `src/app/modules/Tracking/tracking.constants.ts`
+  - `src/app/modules/Tracking/tracking.events.service.ts`
+  - `src/app/modules/Tracking/tracking.interface.ts`
+  - `src/app/modules/Tracking/destinations/klaviyo.ts`
+  - `src/app/modules/Payment/utils/trackingPurchaseEmit.ts`
+  - `src/app/modules/Payment/payment.model.ts` / `payment.interface.ts` (status enum)
+  - `src/app/modules/Payment/services/stripe-webhook.service.ts`
+  - `src/app/modules/Payment/services/fanbasis-webhook.service.ts`
+  - `src/app/modules/Payment/services/callback.service.ts`
+  - `src/app/modules/Payment/services/paypal-webhook.service.ts`
+  - `src/app/modules/Payment/services/cron.service.ts`
+  - `src/app/modules/Payment/services/stranded-reconcile.service.ts` (confirmed out of scope)
+  - `src/app/modules/Payment/payment.service.modular.ts` (Bucket B sites)
+  - Repo-wide grep confirming zero external callers of `TrackingEvents.purchaseFailed` / `"purchase_failed"` outside the Tracking module's own definition files
+- Ticket cmqtl47g4004zny0kz54mmz0z (Trading Cult, Klaviyo purchase-coverage gap) — project context provided by orchestrator
 
 ---
-*Stack research for: S2S partner postback tracking (v1.3 CRM Partner Tracking)*
-*Researched: 2026-07-01*
+*Stack research for: v1.4 Klaviyo purchase-failure tracking coverage*
+*Researched: 2026-07-03*

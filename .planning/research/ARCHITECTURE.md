@@ -1,310 +1,265 @@
-# Architecture Research: CRM Partner S2S Postback (v1.3)
+# Architecture Research
 
-**Domain:** S2S conversion postback — partner click-ID capture, persistence, and GET postback firing via existing tracking infrastructure
-**Researched:** 2026-07-01
-**Confidence:** HIGH — based on direct code reads of all named files
+**Domain:** Tracking/destinations dispatch integration — wiring `purchase_failed` tracking events into existing Payment failure/expiry code paths (v1.4 milestone)
+**Researched:** 2026-07-03
+**Confidence:** HIGH (all findings verified directly against source files in `pft-backend` @ branch `main-2026`; no training-data assumptions used)
 
----
+## Correction to milestone brief assumptions
 
-## Existing Tracking Infrastructure (Verified)
+The milestone brief assumed file paths like `src/services/tracking/`, `src/models/Payment.model.ts`, `src/jobs/expirePendingPayments.job.ts`, `src/controllers/stripeWebhook.controller.ts` — **none of these exist**. The actual module lives under `src/app/modules/Tracking/` and `src/app/modules/Payment/`, following this codebase's modular-by-domain layout (`src/app/modules/<Domain>/<domain>.{model,interface,service,controller}.ts`). All findings below are from the real files, read directly.
 
-### Dispatch Framework
+**Bigger correction:** `purchase_failed` is **already a fully-registered, fully-wired event** in the tracking catalog (`EVENT_NAMES`, `DEFAULT_EVENT_TOGGLES`, `EVENT_MAPPING`, and a `TrackingEvents.purchaseFailed()` helper all already exist). There is **no separate `purchase_expired` event** — the codebase's existing design uses a single `purchase_failed` event name for both failure and expiry outcomes (mirroring `IPayment.status` having distinct `failed`/`expired` string values, but the tracking layer intentionally collapses them into one tracking event, differentiated via the `errorCode` field). **The only actual gap is that `TrackingEvents.purchaseFailed()` is never called from any Payment code path** — it was scaffolded (v1.3 or earlier) but never wired to a real call site. This milestone is close to 100% "add call sites," ~0% "add new event type."
+
+## Standard Architecture
+
+### System Overview
 
 ```
-Business event (e.g. registration / payment complete)
-         |
-         v
-TrackingEvents.signupCompleted() / .purchaseCompleted()
-  [ tracking.events.service.ts:38 / :61 ]
-         |
-         v
-dispatch(payload, { req }) — tracking.service.ts:150
-         |
-   enrichClickIds()         enrichUserData()      enrichRequestContext()
-   [enrichment/click-ids.ts:10]  [user-data.ts]     [request-context.ts]
-         |
-         v
-   destinationAcceptsEvent() per destination  [tracking.service.ts:66]
-         |
-    +----+------------------------------------------+
-    |  conversionWebhook adapter                    |
-    |  [destinations/conversion-webhook.ts:34]      |
-    |  EVENT_NAME_MAP (lines 19-25):                |
-    |    phase_passed      -> ChallengePassed        |
-    |    account_breached  -> ChallengeFailed        |
-    |    payout_completed  -> PayoutCompleted        |
-    |    kyc_verified      -> KYCCompleted           |
-    |    account_funded    -> AccountFunded          |
-    |  NOTE: signup_completed and                   |
-    |  purchase_completed are NOT in this map       |
-    |  -> adapter returns "skipped" for both        |
-    +-----------------------------------------------+
-         |
-         v
-ConversionWebhookService.deliverPayload()
-  [Admin/ConversionWebhook/conversion-webhook.service.ts:113]
-  POST JSON to webhookUrl with HMAC signature header
+┌──────────────────────────────────────────────────────────────────────┐
+│                      Payment status transition sites                  │
+│  (webhook handlers, NOWPayments callback, hourly cron)                │
+├──────────────────────────────────────────────────────────────────────┤
+│  stripe-webhook   fanbasis-webhook   callback.service   cron.service  │
+│  .service.ts      .service.ts        .ts (NOWPayments/  .ts (hourly   │
+│  (Stripe)         (FanBasis)         Paysafe generic)   stale sweep)  │
+│       │                │                    │                  │      │
+│       │ payment.status=│"failed"/"expired"; await payment.save()│      │
+│       ▼                ▼                    ▼                  ▼      │
+├──────────────────────────────────────────────────────────────────────┤
+│           TrackingEvents.purchaseFailed(args)  ← NEW CALL SITES        │
+│           (src/app/modules/Tracking/tracking.events.service.ts)       │
+│           already exists, fires eventName:"purchase_failed"           │
+├──────────────────────────────────────────────────────────────────────┤
+│                    dispatch() — tracking.service.ts                   │
+│  (UNCHANGED — settings lookup, enrichment, sampling, per-destination   │
+│   per-event toggle check, dedup via TrackingEventLog, fan-out)         │
+├──────────────────────────────────────────────────────────────────────┤
+│  metaCapi(off)  googleAds(off)  ga4(on)  klaviyo(on)  conversionWebhook│
+│                                                        (off)  ...      │
+│  partnerPostback → hits generic "event not mapped" fallback → skipped │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Config Location
+### Component Responsibilities
 
-`TrackingSettings` collection (`tracking_settings`) — one active doc per environment (production / staging / development). Destination sub-doc at `destinations.conversionWebhook` holds `{ enabled, webhookUrl, webhookSecret }` — from `tracking.model.ts:74-80` and `tracking.interface.ts:116-119`. This is the per-brand config location (per-DB isolation, no brandId field needed).
+| Component | File | Responsibility | Change needed for this milestone |
+|-----------|------|-----------------|-----------------------------------|
+| Event catalog | `src/app/modules/Tracking/tracking.interface.ts` | Defines `EVENT_NAMES` (includes `"purchase_failed"` at line 20), `ITrackingEventPayload` shape (`errorCode`, `reason` fields already present) | NONE — already has `purchase_failed` registered |
+| Default toggles | `src/app/modules/Tracking/tracking.constants.ts` | `DEFAULT_EVENT_TOGGLES.purchase_failed` (line 42): `ga4:true, klaviyo:true`, all else false; `EVENT_MAPPING.purchase_failed` (line 122): `ga4:"purchase_failed"`, `fbEvent:"PurchaseFailed"`, `fbStandard:false`, `klaviyo:"Purchase Failed"` | NONE — already fully mapped |
+| Typed helper | `src/app/modules/Tracking/tracking.events.service.ts` | `TrackingEvents.purchaseFailed(args, req?)` (lines 96-105) — accepts `userId, email, invoiceId, value, currency, errorCode` | NONE required to compile/work — helper exists, ready to call. **Optionally** extend `args` with `programId`/`accountSize`/`paymentMethod`/`eventId` for parity with `purchaseCompleted`'s richer payload, but not required for this milestone |
+| Dispatcher | `src/app/modules/Tracking/tracking.service.ts` | `dispatch()` — settings load/cache, click-id/user-data/request enrichment, sampling, per-destination `destinationAcceptsEvent()` check, dedup reserve via `TrackingEventLog`, `Promise.allSettled` fan-out | NONE — fully generic over `eventName`, zero special-casing |
+| Klaviyo adapter | `src/app/modules/Tracking/destinations/klaviyo.ts` | Looks up `EVENT_MAPPING[payload.eventName].klaviyo` → `"Purchase Failed"` metric, POSTs to Klaviyo Events API | NONE — generic, already resolves `purchase_failed` → `"Purchase Failed"` |
+| Partner postback adapter | `src/app/modules/Tracking/destinations/partner-postback.ts` | Only branches on `signup_completed` / `purchase_completed` / `pap_payment_completed`; anything else hits the `else` fallback (lines 74-81) returning `status:"skipped", error:"event not mapped: purchase_failed"` | NONE — safe no-op by construction, verified in source |
+| Meta CAPI / GA4 / conversionWebhook adapters | `src/app/modules/Tracking/destinations/{meta-capi,ga4-measurement,conversion-webhook}.ts` | Not fully re-verified line-by-line this pass, but the architecture pattern (table-driven via `EVENT_MAPPING`, no event-name special-casing observed in Klaviyo/partner-postback) is consistent across adapters | Should be NONE; recommend a quick grep sanity-check during implementation for any code that special-cases `eventName === "purchase_completed"` the way partner-postback does |
+| Payment model / status enum | `src/app/modules/Payment/payment.interface.ts` (line 109) | `status: "pending" \| "completed" \| "failed" \| "cancelled" \| "expired" \| "partially_paid" \| "processing" \| "capturing"` | NONE — enum already has both `failed` and `expired` |
+| Purchase-completed emit helper | `src/app/modules/Payment/utils/trackingPurchaseEmit.ts` | `emitTrackingPurchaseCompleted(payment)` — the actual pattern to mirror: PAP-skip guard, FTD `isFirstPurchase` count, `eventId: "purchase:<paymentId>"`, wrapped in try/catch, called via `void emitTrackingPurchaseCompleted(payment)` (fire-and-forget) | Pattern to replicate for the failure case (see Pattern 1 below) |
 
-### Current Click-ID Enrichment
+## Recommended Project Structure
 
-`enrichClickIds` (`enrichment/click-ids.ts:10-40`) reads: Meta `_fbc`/`_fbp`, `gclid`, `ttclid`, `msclkid`, `li_fat_id` — from request cookies and query string, merged onto the payload. There is no `partnerClickId` / `aff_click_id` / generic partner param. This file must be extended.
+No new folders needed. This is a call-site-addition milestone within the existing structure:
 
----
+```
+src/app/modules/
+├── Tracking/
+│   ├── tracking.events.service.ts     # purchaseFailed() ALREADY EXISTS here — no edit needed
+│   ├── tracking.interface.ts          # purchase_failed ALREADY in EVENT_NAMES — no edit needed
+│   ├── tracking.constants.ts          # purchase_failed ALREADY in toggles+mapping — no edit needed
+│   └── destinations/                  # all adapters generic — no edit needed
+├── Payment/
+│   ├── payment.interface.ts           # status enum already has failed/expired — no edit needed
+│   ├── utils/
+│   │   ├── trackingPurchaseEmit.ts         # existing purchaseCompleted pattern to MIRROR
+│   │   └── trackingPurchaseFailedEmit.ts   # NEW — recommended shared helper (see Pattern 1)
+│   └── services/
+│       ├── stripe-webhook.service.ts       # MODIFY — call sites in handlePaymentIntentFailed + handleCheckoutSessionExpired (+ optional security-mismatch branches)
+│       ├── fanbasis-webhook.service.ts     # MODIFY — call sites in handlePaymentFailed + handlePaymentExpired
+│       ├── callback.service.ts             # MODIFY — 1 call site in handleNonCompletedPayment (covers NOWPayments; verify Paysafe routing too)
+│       └── cron.service.ts                 # MODIFY — call site(s) in checkAndExpirePendingPayments (covers both the expired and stuck-processing/failed branches)
+```
 
-## Critical Gap: signup_completed and purchase_completed Are Not Wired
+### Structure Rationale
 
-**Finding (HIGH confidence):** `TrackingEvents.signupCompleted()` is defined at `tracking.events.service.ts:38` but is never called anywhere in the codebase. Same for `TrackingEvents.purchaseCompleted()` at line 61.
+- No new files are strictly required — every integration point is a small addition (1-5 lines) inside an existing function, right after the existing `payment.status = "failed"/"expired"; await payment.save();` line.
+- A new shared helper (`trackingPurchaseFailedEmit.ts`) is recommended for consistency: it mirrors `emitTrackingPurchaseCompleted`'s shape (accepts a loose `PaymentLike`, builds the args, wraps in try/catch, fire-and-forget) so all 5+ call sites use one function instead of hand-rolling `TrackingEvents.purchaseFailed({...})` inline everywhere. This avoids drift in field-mapping (e.g. always using `usdAmount`/`"USD"` consistently, mirroring the "never billed currency" rule already enforced by `emitTrackingPurchaseCompleted` to guard against the known JPY-as-USD bug class documented in project memory).
 
-- Registration completion fires `FacebookPixelService.trackStandardEvent("CompleteRegistration", ...)` at `auth.service.ts:1021` — a direct legacy path that bypasses the tracking dispatcher entirely.
-- Purchase completion fires `emitPurchaseCompletedWebhook(payment)` at `payment.service.modular.ts:1499` (free/coupon path) and the post-save hook fires Prometheus metrics only (`payment.model.ts:337`). The `emitPurchaseCompletedWebhook` helper calls `SalesWebhookDispatcher.purchaseCompleted()` — which routes to the SalesWebhook system (a separate webhook-config collection), not the tracking dispatch system.
-- The Tracking dispatcher's `purchase_completed` event has no call site and the `conversionWebhook` adapter has no mapping for it.
-- `tracking.constants.ts:29,40` shows `conversionWebhook: true` for both events — meaning the dispatcher will route them to the adapter, which immediately returns "skipped" because neither event is in `EVENT_NAME_MAP`.
+## Architectural Patterns
 
-**Consequence:** Both `signup_completed` and `purchase_completed` must be wired as new call sites as part of this milestone before the postback can fire.
+### Pattern 1: Shared `emitTrackingPurchaseFailed()` helper mirroring `emitTrackingPurchaseCompleted()`
 
----
+**What:** A single utility function (new file `src/app/modules/Payment/utils/trackingPurchaseFailedEmit.ts`) that every failure/expiry call site invokes, instead of calling `TrackingEvents.purchaseFailed()` directly.
 
-## Integration Design
+**When to use:** Any place `payment.status` is set to `"failed"` or `"expired"` and then persisted via `payment.save()` / `updateOne()` / `updateMany()`.
 
-### 1. Where the Partner Click ID Is Captured and Persisted
+**Trade-offs:** Slightly more indirection than calling `TrackingEvents.purchaseFailed()` directly at each site, but it centralizes the "never billed currency, always `usdAmount`" rule and a consistent dedup `eventId` convention in one place — matching how `emitTrackingPurchaseCompleted` already centralizes that logic for the success path. Given this codebase already has that pattern for completed purchases, using the same shape for failures keeps the two code paths symmetric and easy to review together.
 
-**Decision: Store `partnerClickId` on the User document, captured at registration via a body field forwarded from the frontend cookie.**
-
-Rationale:
-- The User document (`auth.model.ts:186`) is the natural per-user persistent record, already available at every downstream event emit site by userId lookup.
-- The click-to-registration gap is the hardest: the user is anonymous at click time and has an identity only after OTP verification completes (`auth.service.ts:820-953`). A cookie (set on the frontend on landing, forwarded as a body field at signup) is the reliable bridge — no server-side session exists between anonymous click and account creation.
-- The click-to-purchase gap is trivially solved: `userId` is known at payment time; look up `user.partnerClickId`.
-- `partnerClickId` is written once at registration and read at every subsequent event. It never changes. This satisfies "survives click to registration to purchase."
-
-**Capture flow:**
-1. Frontend landing page receives `?clickid=<value>` (or partner param name `?aff_click_id=` etc.) from the partner redirect URL.
-2. Frontend stores the raw value in a first-party cookie (e.g. `_partner_clickid`, 30-day expiry, same pattern as `_fbc`/`_gclid`).
-3. At registration, the frontend reads the cookie and forwards it as `req.body.partnerClickId`.
-4. `TRegisterUser` interface (`auth.interface.ts:320`) gains `partnerClickId?: string`.
-5. `UserSchema` (`auth.model.ts:186`) gains `partnerClickId: { type: String, index: true }`.
-6. `AuthService.verifyRegistrationOtp` (`auth.service.ts:820`) writes the field to the user document in the `User.findByIdAndUpdate` call at line 830.
-
-**Alternative rejected:** A separate `PartnerClick` collection keyed by session token adds a lookup hop and requires a token threaded through the OTP flow — over-engineered for a one-partner MVP.
-
-### 2. How the Click ID Reaches the Emit Points
-
-**signup_completed:** Add `TrackingEvents.signupCompleted({ userId, email, partnerClickId: registeredUser.partnerClickId })` in the post-OTP block of `auth.service.ts` around line 1020 (after the existing `FacebookPixelService.trackStandardEvent` call). Pass `null` for req — `auth.controller.ts` does not propagate req into the service layer, and the partnerClickId is already on the user doc, not the live request.
-
-**purchase_completed (paid path):** Gateway callbacks (`callback.service.ts`) and Stripe webhooks (`stripe-webhook.service.ts`) do not currently call any `TrackingEvents` for the purchase event. A shared utility — mirroring `emitPurchaseCompletedWebhook` (`payment/utils/salesWebhookEmit.ts:36`) but targeting the tracking system — should be added. It receives the payment doc, does a lightweight `User.findById(payment.userId).select("partnerClickId")`, then calls `TrackingEvents.purchaseCompleted({ ..., partnerClickId })`. This utility is called from all paid-completion paths.
-
-**purchase_completed (free/coupon path):** Called at `payment.service.modular.ts:1499` alongside `emitPurchaseCompletedWebhook`. Add the new tracking utility call there.
-
-**`enrichClickIds` extension (`enrichment/click-ids.ts:10`):** Add reading `_partner_clickid` cookie as a fallback for `payload.partnerClickId`. This handles the case where a request object is available (browser-side events); for server-side-only paths the value comes from the user doc, not the cookie.
-
-### 3. How the S2S GET Postback Is Fired
-
-**Decision: Add a new sibling `partnerPostback` destination adapter. Do NOT modify the existing `conversionWebhook` adapter.**
-
-Rationale for a new adapter:
-- The existing `conversionWebhookAdapter` (`destinations/conversion-webhook.ts`) is a POST JSON adapter with HMAC signing. S2S postbacks for CPA networks are GET requests with URL macro substitution (e.g. `https://partner.net/postback?clickid={clickid}&amount={amount}`). These are different transport contracts.
-- Adding a GET branch to the existing adapter would put a mode-switch into an adapter that already has a live partner integration, risking silent breaks to existing POST delivery logs and the HMAC signing codepath.
-- A new `partnerPostback` adapter registered in `destinations/index.ts:14` alongside `conversionWebhookAdapter` is isolated, testable, and follows the established `IDestinationAdapter` contract (`destinations/base.ts:27`).
-
-**Adapter behavior (`destinations/partner-postback.ts`):**
-- `send(payload, ctx)` reads `ctx.settings.destinations.partnerPostback.postbackUrlTemplate`.
-- Returns `{ status: "skipped" }` if template is empty or `payload.partnerClickId` is absent.
-- Substitutes macros `{clickid}`, `{event}`, `{amount}`, `{currency}`, `{userid}`, `{orderid}` with values from payload.
-- Issues an outbound HTTP GET. No body. 15-second timeout.
-- Returns `{ status: "sent", responseMeta: { httpStatus } }` on 2xx, `{ status: "failed" }` otherwise.
-
-### 4. Where the Partner's Postback URL Template Lives
-
-**Decision: Add `partnerPostback` as a new destination sub-document in `TrackingSettings`.**
-
-Rationale:
-- `TrackingSettings` (`tracking.model.ts:109`) is the per-brand (per-DB) config store for all destinations. Adding a `partnerPostback` destination sub-doc is the minimum-schema-change path.
-- The admin configures and enables/disables it via the existing `PUT /api/tracking/settings` endpoint — no new admin routes.
-- Per-brand: the Trading Cult DB gets the Trading Cult partner URL; other brands leave it empty and the adapter skips.
-- Avoids env vars (not per-brand) and a separate config collection (over-engineered for minimal scope).
-
-**Minimum config shape added to `tracking.interface.ts:116` area:**
+**Example (mirroring existing `emitTrackingPurchaseCompleted` exactly):**
 ```typescript
-interface IPartnerPostbackConfig extends IDestinationToggle {
-  postbackUrlTemplate: string; // e.g. "https://partner.net/postback?clickid={clickid}&event={event}&amount={amount}"
+// src/app/modules/Payment/utils/trackingPurchaseFailedEmit.ts
+import { TrackingEvents } from "../../Tracking/tracking.events.service";
+
+interface PaymentLike {
+  _id?: unknown;
+  userId?: unknown;
+  billingInfo?: { email?: string | null } | null;
+  usdAmount?: number | null;
+  invoice?: string | null;
+  status?: string | null; // "failed" | "expired" at call time
+}
+
+/**
+ * Emit a `purchase_failed` tracking event for a payment that just transitioned
+ * to "failed" or "expired". Fire-and-forget, fully swallowed.
+ *
+ * eventId = "purchase_failed:<paymentId>:<status>" — distinct from the
+ * "purchase:<paymentId>" key used by emitTrackingPurchaseCompleted, so a
+ * payment that fails then later succeeds on retry never has its dedup
+ * key collide with the eventual purchase_completed event.
+ */
+export async function emitTrackingPurchaseFailed(
+  payment: PaymentLike | null | undefined,
+  errorCode?: string,
+): Promise<void> {
+  if (!payment?._id) return;
+  try {
+    TrackingEvents.purchaseFailed({
+      userId: payment.userId != null ? String(payment.userId) : undefined,
+      email: payment.billingInfo?.email ?? undefined,
+      invoiceId: payment.invoice ?? undefined,
+      value: payment.usdAmount ?? undefined,   // normalized USD; never billed currency
+      currency: "USD",
+      errorCode: errorCode ?? payment.status ?? undefined, // "failed" | "expired" | specific reason
+    });
+  } catch {
+    // last-resort safety net — tracking must never surface to callers
+  }
 }
 ```
 
-Event toggles via `IDestinationToggle.events` map — default `signup_completed: true`, `purchase_completed: true`, all others false.
+Call sites then become a single line right after the existing `payment.save()`:
+```typescript
+payment.status = "expired";
+await payment.save();
+void emitTrackingPurchaseFailed(payment, "checkout_expired");
+```
 
----
+### Pattern 2: Fire immediately after persistence, never before
 
-## New vs. Modified Components
+**What:** Every existing `purchaseCompleted`/`papPaymentCompleted` call site fires the tracking event only after `payment.save()` resolves — never before, never coupled to a risk of rollback.
 
-### New Components
+**When to use:** All new call sites.
 
-| File | What | Why New |
-|------|------|---------|
-| `pft-backend/src/app/modules/Tracking/destinations/partner-postback.ts` | GET postback adapter with macro substitution | Different transport contract from existing POST adapter |
-| `pft-backend/src/app/modules/Payment/utils/trackingPurchaseEmit.ts` | Utility to fire TrackingEvents.purchaseCompleted with partnerClickId lookup | Mirrors salesWebhookEmit pattern; keeps emit sites DRY |
+**Trade-offs:** None — straightforward consistency rule. Following it avoids tracking a status transition that never actually got persisted (e.g. if `save()` throws downstream of setting `.status` in memory).
 
-### Modified Components
+### Pattern 3: `void` fire-and-forget, never `await`
 
-| File | Location | Change |
-|------|----------|--------|
-| `auth.interface.ts` | TRegisterUser at line 320 | Add `partnerClickId?: string` |
-| `auth.model.ts` | UserSchema around line 479 | Add `partnerClickId: { type: String, index: true }` |
-| `auth.service.ts` | verifyRegistrationOtp: findByIdAndUpdate at line 830 | Pass `partnerClickId` into the user update |
-| `auth.service.ts` | Post-registration block after line 1020 | Add `TrackingEvents.signupCompleted({ userId, email, partnerClickId })` |
-| `tracking.interface.ts` | DESTINATIONS const at line 51 | Add `"partnerPostback"` |
-| `tracking.interface.ts` | destinations map at line 142 | Add `partnerPostback: IPartnerPostbackConfig` |
-| `tracking.interface.ts` | ITrackingEventPayload at line 168 | Add `partnerClickId?: string` |
-| `tracking.constants.ts` | DEFAULT_EVENT_TOGGLES at line 23 | Add `partnerPostback` column with `signup_completed: true`, `purchase_completed: true`, all others false |
-| `tracking.model.ts` | Around line 74 (destination sub-schemas) | Add `PartnerPostbackConfigSchema` and wire into `destinations` sub-doc |
-| `destinations/index.ts` | registerAllAdapters at line 14 | Add `registerAdapter(partnerPostbackAdapter)` |
-| `enrichment/click-ids.ts` | enrichClickIds at line 10 | Read `_partner_clickid` cookie fallback; pass through `payload.partnerClickId` |
-| `payment.service.modular.ts` | Around line 1499 | Add call to `emitTrackingPurchaseCompleted(payment)` |
-| `payment/services/callback.service.ts` | Payment completion site around line 395 | Add call to `emitTrackingPurchaseCompleted(payment)` |
-| `payment/services/stripe-webhook.service.ts` | PAP payment completion around line 507 | Add call to `emitTrackingPurchaseCompleted(payment)` if applicable |
+**What:** All existing tracking calls in webhook/callback code use `void emitTrackingPurchaseCompleted(payment)` or bare `TrackingEvents.papPaymentCompleted({...})` without awaiting — the helper's internal `fireAndForget()` (in `tracking.events.service.ts`) already does `dispatch(...).catch(logger.warn)`.
 
----
+**When to use:** All new call sites — do not `await` the tracking call inside the webhook handler's critical path.
+
+**Trade-offs:** A tracking dispatch failure is fully invisible to the webhook response (by design — "tracking failures must never affect business operations" per the code comment at the top of `tracking.events.service.ts`). This is correct for this domain.
 
 ## Data Flow
 
-### Click to Registration to Postback
+### Real call sites where Payment.status → "failed" / "expired" happens today
 
-```
-Partner ad click -> frontend landing page (?clickid=ABC123)
-  |
-  Set cookie: _partner_clickid=ABC123 (30-day, first-party)
-  |
-  User fills signup form
-  POST /api/auth/register
-  body: { ...fields, partnerClickId: "ABC123" }  <- read from cookie by frontend JS
-  |
-  AuthService.initiateRegistration() stores partnerClickId on temp (unregistered) user doc
-  (OTP email sent)
-  |
-  POST /api/auth/register/verify-otp
-  AuthService.verifyRegistrationOtp() [auth.service.ts:820]
-    -> User.findByIdAndUpdate(..., { partnerClickId: "ABC123", isRegistered: true, ... })
-                                                               [line ~830]
-  |
-  TrackingEvents.signupCompleted({ userId, email, partnerClickId: "ABC123" })
-  [auth.service.ts ~1020 -- NEW CALL SITE]
-  |
-  dispatch(payload) -> partnerPostback adapter
-    payload.partnerClickId = "ABC123"
-    resolves template: https://partner.net/postback?clickid=ABC123&event=signup_completed
-    HTTP GET (fire-and-forget)
-    -> 200 OK -> status: "sent"
-```
+| # | File | Function | Status set | Trigger | Volume estimate |
+|---|------|----------|-----------|---------|------------------|
+| 1 | `src/app/modules/Payment/services/cron.service.ts` | `CronService.checkAndExpirePendingPayments()` (runs hourly via `setInterval` in `src/server.ts` ~line 298, plus once on startup) | `"expired"` (pending >1hr) via `updateMany` (line 35); `"failed"` (processing stuck >10min) via `updateMany` (line 43) | Hourly cron sweep, provider-agnostic (catches Stripe/Paysafe/NOWPayments/FanBasis/any payment method whose webhook never arrives) | **Highest — this is the catch-all for every abandoned/stuck checkout across all payment providers**, since it's the only path that doesn't depend on a specific webhook firing |
+| 2 | `src/app/modules/Payment/services/stripe-webhook.service.ts` | `handlePaymentIntentFailed()` (lines 304-339) | `"failed"` (line 325) | Stripe webhook `payment_intent.payment_failed` | Medium — real-time explicit decline signal from Stripe |
+| 2b | same file | `handleCheckoutSessionExpired()` (lines 344-390) | `"expired"` (line 376) | Stripe webhook `checkout.session.expired` | Medium — explicit Stripe-native session-timeout signal |
+| 2c | same file | `handleCheckoutSessionCompleted()` / `handlePaymentIntentSucceeded()` security-mismatch branches | `"failed"` (lines 103, 132, 245, 272) | Currency/amount mismatch detected during otherwise-successful-looking webhook (fraud/manipulation defense) | Low volume but security-relevant — worth tracking too |
+| 3 | `src/app/modules/Payment/services/fanbasis-webhook.service.ts` | `handlePaymentFailed()` (lines 419-431) | `"failed"` (line 423) | FanBasis webhook (explicit failure event) | Medium |
+| 3b | same file | `handlePaymentExpired()` (lines 433-444) | `"expired"` (line 440) | FanBasis webhook (explicit expiry event) — **note: FanBasis DOES send an explicit expiry webhook**, contradicting the milestone brief's assumption that it has none | Medium |
+| 3c | same file | Security-mismatch branches (lines 320, 332) | `"failed"` | Amount/currency manipulation defense | Low volume |
+| 4 | `src/app/modules/Payment/services/callback.service.ts` | `handleCallback()` → `handleNonCompletedPayment()` (lines 805-812) | Generic — receives whatever `newStatus` NOWPayments/crypto callback reported (`"failed"` or `"expired"`) | NOWPayments/crypto callback with non-"completed" status | Lower volume (crypto-specific), but **already has a unified failed+expired handler** — the natural integration point for this provider |
+| 5 | `src/app/modules/Payment/services/paysafe.service.ts` | `mapStatus()` (line 929) maps Paysafe's own status vocabulary to `"waiting"\|"confirmed"\|"expired"\|"failed"` | Feeds into `payment_status`-style field (line 964) consumed downstream — **not yet confirmed** whether Paysafe routes through `callback.service.ts`'s generic handler or has its own separate webhook controller that sets `payment.status` directly | Unconfirmed — needs a follow-up grep for the Paysafe webhook controller/route during implementation to confirm which handler ultimately calls `payment.save()` |
 
-### Purchase to Postback
+### Key Data Flow
 
-```
-Payment gateway callback / Stripe webhook
-  -> callback.service.ts: payment.status = "completed" (~line 395)
-  |
-  emitTrackingPurchaseCompleted(payment)  [NEW utility]
-    -> User.findById(payment.userId).select("partnerClickId")
-    -> TrackingEvents.purchaseCompleted({ userId, value, currency, partnerClickId })
-  |
-  dispatch(payload) -> partnerPostback adapter
-    resolves template: https://partner.net/postback?clickid=ABC123&event=purchase_completed&amount=99
-    HTTP GET
-```
+1. **Cron sweep (highest volume):** `setInterval` in `src/server.ts` → `CronService.checkAndExpirePendingPayments()` runs every 60 minutes (plus once on boot) → bulk `updateMany` on stale `pending`/`processing` payments. This is a **bulk update**, not a per-document loop with hydrated documents — the current code does `Payment.find(...)` to get the stale list (fully hydrated, includes `billingInfo`, `usdAmount`, etc.), then two separate `updateMany` calls (lines 33-38, 41-45), then only iterates the already-fetched `stalePayments` array for logging (lines 48-52). Tracking calls should be added inside this existing logging loop, using the `pendingIds`/`processingIds` splits already computed at lines 27-28 to know which outcome (`"expired"` vs `"failed"`) each payment received — the in-memory `payment.status` on the pre-fetched objects is still the OLD status, so don't branch on it directly; branch on which id-array the payment's `_id` belongs to.
+2. **Webhook paths (Stripe, FanBasis):** each handler already hydrates a full `payment` document via `Payment.findOne(...)`, mutates `.status`, and calls `payment.save()` — the tracking call slots in immediately after `save()` with the already-in-scope `payment` variable.
+3. **NOWPayments/crypto callback:** `handleNonCompletedPayment(payment, status)` already receives the hydrated `payment` and the resolved `status` string — this is the cleanest single integration point of all 5, since it's already a shared dispatcher for both `"failed"` and `"expired"` outcomes (see the existing `if (status === "failed" || status === "expired")` check at line 809 gating the existing notification logic — the same `if` block is where the tracking call belongs).
 
----
+## Scaling Considerations
 
-## Dependency-Ordered Build Sequence
+| Scale | Architecture Adjustments |
+|-------|--------------------------|
+| Current (per-brand DB, moderate payment volume) | Adding `void emitTrackingPurchaseFailed(payment, reason)` calls at 5-7 sites is negligible overhead — same pattern as existing `purchaseCompleted`/`papPaymentCompleted` calls which already run at every real completion today |
+| Cron sweep at high stale-payment counts | The cron's `for (const payment of stalePayments)` loop is currently sequential logging only; adding a `void emitTrackingPurchaseFailed(...)` call per iteration keeps it non-blocking (fire-and-forget) so it won't slow the loop meaningfully even with hundreds of stale payments per hourly run |
+| Klaviyo/Meta/GA4 API volume | `purchase_failed` will likely fire more often than `purchase_completed` in aggregate (abandoned checkouts + real declines are typically more common than completions). For brands with Klaviyo enabled (`ga4:true, klaviyo:true` by default per `DEFAULT_EVENT_TOGGLES.purchase_failed`), this adds meaningful new outbound API call volume. Not a blocker — the existing per-destination dedup + `Promise.allSettled` fan-out already scales with event count, no code change needed to handle it |
 
-**Phase A: Click ID capture and persistence** (must be first — nothing can fire without the stored ID)
-1. Add `partnerClickId` to `TRegisterUser` interface and `UserSchema`.
-2. Write `partnerClickId` in `verifyRegistrationOtp` at the findByIdAndUpdate call.
-3. Pass `partnerClickId` through `initiateRegistration` (the two-step OTP path stores it on the pre-verified user doc so it's available at OTP completion).
-4. Frontend: set `_partner_clickid` cookie on landing; forward in signup body (parallel frontend work).
-5. Verification: manual test registration with `partnerClickId` in body; confirm field on user doc.
+### Scaling Priorities
 
-**Phase B: Wire the emit points** (depends on Phase A — the stored value must exist before emitting)
-6. Add `partnerClickId?: string` to `ITrackingEventPayload`.
-7. Extend `enrichClickIds` with cookie fallback.
-8. Add `TrackingEvents.signupCompleted()` call in `auth.service.ts:1020` block.
-9. Implement `trackingPurchaseEmit.ts` utility (DB lookup + TrackingEvents.purchaseCompleted call).
-10. Add utility call to `payment.service.modular.ts:1499` (free path) and `callback.service.ts` / `stripe-webhook.service.ts` (paid paths).
+1. **First bottleneck:** None expected from this change alone — it's additive within an already-proven dispatch path.
+2. **Second consideration:** If a brand's Klaviyo account has strict Events API rate limits and abandonment/failure rates are high, monitor `TrackingEventLog` `status:"failed"` rows for the `klaviyo` destination post-rollout — an operational concern, not an architectural blocker for this milestone.
 
-**Phase C: New adapter and config** (depends on Phase B for integration tests that exercise end-to-end flow)
-11. Add `"partnerPostback"` to DESTINATIONS, interface shape, constants table, and model schema.
-12. Implement `partner-postback.ts` adapter (GET, macro substitution, skip if no clickid or no template).
-13. Register adapter in `destinations/index.ts`.
-14. Configure `postbackUrlTemplate` in TrackingSettings for Trading Cult's brand DB.
+## Anti-Patterns
 
-**Phase D: End-to-end verification**
-15. Test signup with `?clickid=TEST123` -> confirm User doc field, confirm GET fires with clickid in URL.
-16. Test paid purchase -> confirm GET fires with amount macro resolved.
-17. Confirm existing `conversionWebhook` POST deliveries are unaffected.
-18. Confirm `conversionWebhook` still returns "skipped" for signup/purchase events (not "failed").
+### Anti-Pattern 1: Registering a new `purchase_expired` event name
 
----
+**What people might do:** Since `IPayment.status` has both `"failed"` and `"expired"` as distinct values, it's tempting to add a matching `"purchase_expired"` entry to `EVENT_NAMES` for a 1:1 mapping.
 
-## Anti-Patterns to Avoid
+**Why it's wrong:** The tracking layer already made the deliberate design decision to have a single `purchase_failed` tracking event cover both outcomes — `TrackingEvents.purchaseFailed()`'s existing `errorCode` field is exactly the mechanism for distinguishing failure reasons (pass `"expired"` / `"checkout_expired"` vs `"card_declined"` vs `"currency_mismatch"`). Adding a second event name would require also adding entries to `DEFAULT_EVENT_TOGGLES`, `EVENT_MAPPING`, a Klaviyo settings-UI row (if a distinct UI exists for it), and any Super Admin config key — none of which exist today for "expired" as distinct from "failed," and there's no evidence in the code that this distinction was ever intended at the tracking layer.
 
-### Anti-Pattern 1: Reading the Click ID Only from the Request Cookie at Fire Time
+**Do this instead:** Reuse `TrackingEvents.purchaseFailed()` for both outcomes, differentiating via the existing `errorCode` field. This requires zero schema/catalog changes and lets Klaviyo flows segment on the `errorCode` property (already carried through `payload.properties`/`buildProperties()` in the Klaviyo adapter) if finer-grained flow branching is wanted later.
 
-**What people do:** Skip persisting to User doc; instead read `_partner_clickid` cookie off the request at dispatch time via `enrichClickIds`.
+### Anti-Pattern 2: Adding event-name-specific branching inside `dispatch()` or the adapters
 
-**Why it's wrong:** `purchase_completed` fires from gateway webhook callbacks (`callback.service.ts`) and potentially cron-adjacent provisioning paths that have no request object. `req` is `null` at those sites. `enrichClickIds` at `click-ids.ts:14` explicitly guards `(req?.cookies as ...) || {}` — produces nothing without a request. The clickid is silently lost and no postback fires.
+**What people might do:** Touch `tracking.service.ts`'s `dispatch()` function or add `if (payload.eventName === "purchase_failed")` branches inside `klaviyo.ts`/`meta-capi.ts`/etc.
 
-**Do this instead:** Persist to User doc at registration. Fetch from DB at purchase emit time.
+**Why it's wrong:** The entire point of the `EVENT_MAPPING`/`DEFAULT_EVENT_TOGGLES` table-driven design is that adapters never need to know about specific event names — they look up `EVENT_MAPPING[payload.eventName]` generically. `purchase_failed` already has a row in that table. Touching the dispatcher or an adapter for this milestone would be scope creep into code that doesn't need to change and risks breaking the 25+ other events that share this same generic path.
 
-### Anti-Pattern 2: Adding a GET Mode to the Existing conversionWebhook Adapter
+**Do this instead:** Only touch the 4-5 Payment-module files listed in "Recommended Project Structure" above, plus optionally the new `trackingPurchaseFailedEmit.ts` helper.
 
-**What people do:** Add a `method: "GET"` branch and `postbackUrlTemplate` field to `conversion-webhook.ts`.
+## Integration Points
 
-**Why it's wrong:** The adapter already has a live POST integration with HMAC signing. Adding a GET branch creates a mode-switch, complicates the `deliverPayload` / `signBody` codepath, and conflates two different downstream contracts. A delivery log failure for one partner could shadow the other.
+### External Services
 
-**Do this instead:** New `partnerPostback` adapter as a separate destination.
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| Klaviyo | Already wired — `purchase_failed` → `"Purchase Failed"` metric, `klaviyo:true` default-on | No change needed; this is what "already visible in the Klaviyo settings UI" refers to — the settings UI reads `EVENT_MAPPING`/`DEFAULT_EVENT_TOGGLES` generically, so `purchase_failed` shows up automatically once any event is registered, and it already is |
+| Meta CAPI / GA4 | Already wired at the mapping-table level (`ga4:true` default-on for `purchase_failed`; `fbEvent:"PurchaseFailed"` but `fbStandard:false` since Meta has no standard "purchase failed" event) | `metaCapi` destination is `false` by default for `purchase_failed` per `DEFAULT_EVENT_TOGGLES` (line 42) — this is an intentional existing default (non-standard custom Meta events are typically withheld to avoid CAPI noise); leave as-is unless product explicitly wants it changed |
+| Partner postback | Explicitly does NOT handle `purchase_failed` — falls through to the generic "event not mapped" skip | Confirmed safe no-op; no partner ever receives a postback for a failed/expired purchase, which is almost certainly the desired behavior (partners are paid on conversions, not failures) |
 
-### Anti-Pattern 3: Wiring purchase_completed Only from the Free-Payment Path
+### Internal Boundaries
 
-**What people do:** Add the TrackingEvents call only at `payment.service.modular.ts:1499`.
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| Payment services ↔ Tracking module | Direct function call: `TrackingEvents.purchaseFailed({...})` or new `emitTrackingPurchaseFailed(payment, reason)` helper, fire-and-forget | Same boundary/pattern as the existing `purchaseCompleted`/`papPaymentCompleted` integration — no new coupling introduced |
+| Cron job ↔ Tracking module | Same direct call pattern, invoked from the existing `stalePayments` loop after the bulk `updateMany` | The cron currently does bulk updates without per-document `.save()` — tracking calls must use the pre-fetched hydrated documents from the initial `Payment.find(...)`, not re-fetch |
 
-**Why it's wrong:** That block is the free (zero-amount, 100%-coupon) path only. Real paid completions flow through `callback.service.ts` (all payment gateways) and `stripe-webhook.service.ts` (Stripe PAP). Those paths do not call `payment.service.modular.ts:1499`.
+## Build Order Recommendation
 
-**Do this instead:** A shared utility called from all three completion sites.
+Ordered by real-world volume/impact, per the quality gate ("build order considers which call sites cover the most real-world volume first"):
 
-### Anti-Pattern 4: Using `conversionWebhookAdapter` EVENT_NAME_MAP for signup/purchase
-
-**What people do:** Add `signup_completed: "SignupCompleted"` and `purchase_completed: "PurchaseCompleted"` to the existing `EVENT_NAME_MAP` in `conversion-webhook.ts:19-25`.
-
-**Why it's wrong:** That adapter sends POST JSON to the existing ConversionWebhook partner URL (which already has a live contract). Injecting new events into that POST stream changes the partner's event set without their agreement and bypasses the GET/macro transport the new partner requires.
-
-**Do this instead:** The new `partnerPostback` adapter handles these events independently.
-
----
+1. **`cron.service.ts` — `CronService.checkAndExpirePendingPayments()` — build first.** This is the provider-agnostic catch-all and, per the existing code (sweeps payments "older than 1 hour" pending, or "processing" stuck >10min), almost certainly the single largest source of both `"expired"` and `"failed"` (stuck-processing) status transitions in production — it catches every payment method's silently-abandoned checkouts, not just ones with an explicit provider webhook. Add the tracking call inside the existing `for (const payment of stalePayments)` loop (line 48), branching on whether the payment's `_id` is in `pendingIds` (→ fire with `errorCode:"expired"`) or `processingIds` (→ fire with `errorCode:"failed"`) — the arrays are already computed at lines 27-28.
+2. **`stripe-webhook.service.ts` — build second.** Stripe is very likely the primary card-payment provider (explicit `payment_intent.payment_failed` and `checkout.session.expired` handlers already exist and are well-structured). Add calls in `handlePaymentIntentFailed()` (after line 326) and `handleCheckoutSessionExpired()` (after line 377). Consider also wiring the 4 security-mismatch `"failed"` branches (lines 103, 132, 245, 272) for completeness, though these are lower volume.
+3. **`fanbasis-webhook.service.ts` — build third.** Add calls in `handlePaymentFailed()` (after line 425) and `handlePaymentExpired()` (after line 441).
+4. **`callback.service.ts` (NOWPayments/crypto) — build fourth.** Add a single call inside `handleNonCompletedPayment()` (inside the existing `if (status === "failed" || status === "expired")` block at line 809) — cleanest, lowest-effort integration point since the generic branch already exists, but crypto is presumably lower volume than card payments.
+5. **`paysafe.service.ts` — verify routing, build last.** Before writing any code here, confirm (via the Paysafe webhook controller/route, not yet located in this research pass) whether Paysafe ultimately flows through `callback.service.ts`'s generic `handleNonCompletedPayment` (in which case step 4 already covers it) or has its own separate webhook handler function that sets `payment.status` directly (in which case it needs its own call site, following the same pattern). This ambiguity should be resolved with a quick grep for the Paysafe webhook route/controller before finalizing scope — flagged here rather than guessed at.
 
 ## Sources
 
-- `pft-backend/src/app/modules/Tracking/tracking.service.ts` (dispatch framework — direct read)
-- `pft-backend/src/app/modules/Tracking/destinations/index.ts` (adapter registry — direct read)
-- `pft-backend/src/app/modules/Tracking/destinations/base.ts` (adapter contract — direct read)
-- `pft-backend/src/app/modules/Tracking/destinations/conversion-webhook.ts` (POST adapter, EVENT_NAME_MAP — direct read)
-- `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.service.ts` (direct read)
-- `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.interface.ts` (direct read)
-- `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.model.ts` (direct read)
-- `pft-backend/src/app/modules/Tracking/tracking.constants.ts` (event toggles — direct read)
-- `pft-backend/src/app/modules/Tracking/enrichment/click-ids.ts` (direct read)
-- `pft-backend/src/app/modules/Tracking/tracking.interface.ts` (payload + config shapes — direct read)
-- `pft-backend/src/app/modules/Tracking/tracking.events.service.ts` (call sites confirmed absent — direct read)
-- `pft-backend/src/app/modules/Auth/auth.service.ts` (registration flow — direct read)
-- `pft-backend/src/app/modules/Auth/auth.model.ts` (UserSchema — direct read)
-- `pft-backend/src/app/modules/Auth/auth.interface.ts` (TRegisterUser — direct read)
-- `pft-backend/src/app/modules/Payment/payment.service.modular.ts` (free payment emit — direct read)
-- `pft-backend/src/app/modules/Payment/payment.model.ts` (post-save hook — direct read)
-- `pft-backend/src/app/modules/Payment/services/callback.service.ts` (paid completion — direct read)
-- `pft-backend/src/app/modules/Payment/utils/salesWebhookEmit.ts` (pattern reference — direct read)
-- `pft-backend/src/app/modules/SalesWebhook/salesWebhook.dispatch.ts` (confirmed separate system — direct read)
-- `pft-backend/src/app/modules/Affiliate/clickEvent.model.ts` (confirmed not applicable — direct read)
+- Direct code inspection, `pft-backend` branch `main-2026` (2026-07-03), all HIGH confidence (read directly, not inferred):
+  - `src/app/modules/Tracking/tracking.events.service.ts` (full file)
+  - `src/app/modules/Tracking/tracking.interface.ts` (full file)
+  - `src/app/modules/Tracking/tracking.constants.ts` (full file)
+  - `src/app/modules/Tracking/tracking.service.ts` (full file — the dispatcher)
+  - `src/app/modules/Tracking/destinations/klaviyo.ts` (full file)
+  - `src/app/modules/Tracking/destinations/partner-postback.ts` (lines 1-104)
+  - `src/app/modules/Tracking/dedup/dedup.service.ts` (partial — confirmed `TrackingEventLog`-backed dedup)
+  - `src/app/modules/Payment/payment.interface.ts` (full file — status enum at line 109)
+  - `src/app/modules/Payment/utils/trackingPurchaseEmit.ts` (full file — the pattern to mirror)
+  - `src/app/modules/Payment/services/stripe-webhook.service.ts` (lines 1-390)
+  - `src/app/modules/Payment/services/fanbasis-webhook.service.ts` (lines 280-450)
+  - `src/app/modules/Payment/services/callback.service.ts` (lines 1-60, 200-290, 760-960)
+  - `src/app/modules/Payment/services/cron.service.ts` (full file)
+  - `src/app/modules/Payment/services/paysafe.service.ts` (grep only — `mapStatus` at line 929, webhook routing not fully traced)
+  - `src/server.ts` (lines 280-320 — cron scheduling confirmation)
+- Not verified in this pass (flag for implementation-time follow-up):
+  - Exact Paysafe webhook controller/route file and whether it calls `callback.service.ts` or has independent status-transition logic
+  - Meta CAPI / GA4 / conversionWebhook adapter files were not read line-by-line (only Klaviyo and partner-postback were fully verified) — architecture pattern strongly suggests they're equally generic, but a quick sanity grep during implementation is cheap insurance
 
 ---
-*Architecture research for: CRM Partner S2S Postback (v1.3)*
-*Researched: 2026-07-01*
+*Architecture research for: Klaviyo/tracking purchase-coverage fix (v1.4 milestone) — pft-backend Tracking + Payment modules*
+*Researched: 2026-07-03*

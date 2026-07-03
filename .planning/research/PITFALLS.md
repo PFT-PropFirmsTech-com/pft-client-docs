@@ -1,251 +1,127 @@
 # Pitfalls Research
 
-**Domain:** Partner S2S postback / clickid passthrough in a prop-firm funnel
-**Researched:** 2026-07-01
-**Confidence:** HIGH — all pitfalls grounded in direct codebase inspection of `pft-backend/src/app/modules/Tracking/` and `Admin/ConversionWebhook/`, corroborated by known project history (JPY/USD bug, PAP funnel bypasses, multi-brand per-DB separation).
+**Domain:** Adding failed/expired-purchase tracking events to the existing `pft-backend` Tracking/dispatch framework (v1.4, following v1.3's `signup_completed`/`purchase_completed`/`pap_payment_completed` build)
+**Researched:** 2026-07-03
+**Confidence:** HIGH — grounded in direct reads of the actual v1.3 code (`Tracking/tracking.events.service.ts`, `Tracking/tracking.service.ts`, `Tracking/tracking.constants.ts`, `Tracking/tracking.interface.ts`, `Tracking/dedup/dedup.service.ts`, `Tracking/enrichment/hash.ts`, `Tracking/destinations/klaviyo.ts`, `Payment/utils/trackingPurchaseEmit.ts`, `Payment/payment.model.ts`, `Payment/payment.interface.ts`, `Payment/services/cron.service.ts`, `Payment/services/{fanbasis-webhook,stripe-webhook,callback}.service.ts`, `Payment/payment.service.modular.ts`) in this repo, not generic advice.
 
----
+## Key Ground-Truth Findings (read directly from code, not inferred)
+
+These facts change the shape of the work significantly from a "build it from scratch" assumption — the scaffolding for `purchase_failed` **already exists but is dead code**:
+
+1. `purchase_failed` is already a fully-defined `EventName` (`tracking.interface.ts:20`), has default per-destination toggles (`tracking.constants.ts:42`), and has a Klaviyo metric mapping `"Purchase Failed"` (`tracking.constants.ts:122`) plus a GA4/FB event mapping. `TrackingEvents.purchaseFailed(...)` is a fully-typed helper in `tracking.events.service.ts:96-105` with `{userId, email, invoiceId, value, currency, errorCode}`.
+2. **`TrackingEvents.purchaseFailed` is never called anywhere in the codebase** (confirmed via repo-wide grep — the only match is its own definition). v1.3 built the scaffold, presumably anticipating this v1.4 work, but never wired a single call site.
+3. There is **no `purchase_expired` event name** at all. Only `purchase_failed` exists in the `EVENT_NAMES` enum. Any "expired" tracking must either (a) reuse `purchase_failed` with a `reason: "expired"` distinguishing value, or (b) add a brand-new event name across three files that must all be updated together (`tracking.interface.ts` EVENT_NAMES, `tracking.constants.ts` DEFAULT_EVENT_TOGGLES, `tracking.constants.ts` EVENT_MAPPING) — missing any one silently breaks the pipeline in a specific, characteristic way (see Pitfall 5).
+4. `ITrackingEventPayload` already has both a `reason?: string` field (line 269) AND an `errorCode?: string` field (line 270) — but the Klaviyo adapter's `buildProperties()` (`destinations/klaviyo.ts:20-38`) does **not** map either of them into the outgoing `properties` object. Both fields exist on the payload type and flow all the way to the dispatcher, but silently die at the Klaviyo adapter boundary today.
+5. `dispatch()`'s dedup key (`tracking.service.ts:169-178`) falls back to `deterministicEventId(user, eventName, Date.now())`, which is **minute-bucketed** (`enrichment/hash.ts:85-95`: `Math.floor(timestampMs / 60000)`) whenever the caller does not pass an explicit `eventId`. `purchase_completed` and `pap_payment_completed` both explicitly pass `eventId: "purchase:<paymentId>"` / an equivalent stable key for exactly this reason (documented in code comments at `trackingPurchaseEmit.ts:52-54` and `callback.service.ts:864`). **Any new failed/expired call site that omits an explicit `eventId` will NOT be retry-safe** — it degrades to per-minute dedup only.
+6. The `Payment` model has exactly this status enum (`payment.interface.ts:109`): `"pending" | "completed" | "failed" | "cancelled" | "expired" | "partially_paid" | "processing" | "capturing"`. There is already an `errorMessage?: string` field on `IPayment` (`payment.interface.ts:187`, `payment.model.ts:239`) that gateway webhook handlers can populate — this is the natural source for the `reason`/`errorCode` tracking fields, if it's actually populated on the failure paths (not verified beyond confirming the field exists).
+7. **The expiry cron (`Payment/services/cron.service.ts`, `CronService.checkAndExpirePendingPayments`) is transition-safe by construction** — it does a single `updateMany({status: "pending", createdAt: {$lt: oneHourAgo}}, {$set: {status: "expired"}})` per run, driven by a time-bounded query on the OLD status (`"pending"`), not a re-scan of already-`"expired"` docs. A doc that already has `status: "expired"` will never match this query again on a later tick. This means the classic "cron double-fire" risk is **not a risk for this specific cron as currently written** — but it becomes a risk the moment anyone "helpfully" adds a second query like `find({status: "expired", trackingEventSent: {$ne: true}})` as a retrofit, or if the event-fire is added as a *separate* pass that re-queries by current status instead of being fired inline in the same `updateMany`-driven loop. This is exactly the kind of retrofit likely to be proposed for "add tracking to the cron" and must be resisted.
+8. **Two other places in `payment.service.modular.ts` set `status: "expired"` outside the cron**, and both are concurrency/dedup mechanisms, NOT payment failures:
+   - Line 1451: when a sibling PAP funded-leg payment is found already provisioned (double-click guard), the *current* (second, redundant) payment doc is flipped to `"expired"` and the request returns the *original* doc's success. The user's purchase succeeded — this doc is being marked expired purely to get it out of the way.
+   - Line 2704 (free $0 PAP path): stale `pending`/`processing` FREE PAP attempts (`amount: 0` only) are superseded to `"expired"` to let a fresh retry proceed, again not a real failed purchase.
+
+   **If a naive implementation fires a tracking event on every `status → "expired"` transition wherever it's set (e.g., via a Mongoose `pre("save")`/`post("updateOne")` hook watching for `status === "expired"`), these two non-failure paths will generate false "purchase failed" Klaviyo events for purchases that actually succeeded.** This is the single most repo-specific, highest-value finding of this research — a generic "hook on status change to expired" implementation will misfire here in a way that isn't visible from a spec/ticket description alone. This is also the concrete mechanism behind the ticket's own reported symptom (a client having BOTH a completed AND an expired payment for what was probably the same underlying purchase attempt) — that pattern is exactly what the sibling-supersede guard at line 1451 produces by design, and it is a correct, intentional artifact of the concurrency guard, not a bug to "fix" by collapsing the two Payment docs. The bug risk is solely in whether a new tracking hook incorrectly treats that artifact as a real customer-facing failure.
+9. The Klaviyo adapter (`destinations/klaviyo.ts:61-64`) hard-skips (status `"skipped"`, not an error) any event with no `payload.email`. Failed/expired Payment docs from very early-abandoned checkouts (e.g., a `Pending` payment created before the user ever reaches a step where email is captured/available in scope) may legitimately have no email at the point of expiry — this is a silent-skip, not a crash, so it's easy to ship and not notice the event never reaches Klaviyo for a subset of cases.
+10. The v1.3 JPY bug fix pattern is `value: payment.usdAmount` + `currency: "USD"` always, sourced from `payment.usdAmount` (never `payment.amount`/`payAfterPassRemainingPrice` directly) — confirmed in both `trackingPurchaseEmit.ts:91-92` and `callback.service.ts`'s PAP block. `payment.model.ts`'s `pre("validate")` hook (lines 317-324) backfills `usdAmount` with a **non-currency-converted** fallback (`this.amount ?? this.totalPrice ?? 0`) whenever `usdAmount` is missing at save time — explicitly commented as a best-effort "treat amount as already-USD" safety net for legacy docs. A `Pending` payment that expires without ever having gone through a gateway's explicit FX-conversion step (which, per `upigateway.service.ts`, some but likely not all gateways perform) is exactly the kind of doc most likely to hit this raw fallback. This reintroduces the JPY-as-USD bug class specifically for failed/expired payments, which (per Pitfall 3 below) are structurally MORE likely to hit it than completed payments were.
 
 ## Critical Pitfalls
 
-### Pitfall 1: clickid Not Persisted Beyond the Request Boundary
+### Pitfall 1: Omitting an explicit `eventId` on the new failed/expired call — breaks retry-safety silently
 
 **What goes wrong:**
-The partner's clickid (e.g. `sub1=<clickid>` appended to the landing URL) is read from the incoming request by `enrichClickIds()` at dispatch time. That enrichment reads from `req.cookies` and `req.query` only. For `signup_completed` this works because the signup request is still in scope. But `purchase_completed` is emitted from payment gateway callbacks — NOWPayments, Stripe webhooks, PayPal webhooks — which carry no browser cookies and no original query string. The clickid is gone. The S2S postback for the conversion fires with no clickid, the partner network cannot attribute it, and the commission is lost.
-
-The current `PaymentAttribution` subdoc on the Payment model (`fbc`, `fbclid`, `gclid`, `ttclid`, `msclkid`, `li_fat_id`) stores ad-platform IDs captured at checkout creation time, but there is no `partnerClickId` field and the conversion webhook adapter (`destinations/conversion-webhook.ts`) does not read from `payment.attribution` at all — it only has access to the tracking payload, which in a gateway callback context has no `req`.
+The dispatcher's dedup fallback (`deterministicEventId`) buckets by minute. If the new `TrackingEvents.purchaseFailed(...)` call site doesn't pass `eventId`, then a payment retried (Pending → Expired → new Pending on retry → Completed, or a webhook redelivery arriving 90+ seconds later) can generate the SAME dedup-relevant identity twice with a DIFFERENT `eventId` on each call, defeating dedup entirely — or, in the case of a cron re-invocation more than a minute apart for reasons unrelated to a real second failure, produce duplicate Klaviyo "Purchase Failed" events for what is really the same transition.
 
 **Why it happens:**
-The existing enrichment design is correct for ad-platform pixels (Meta CAPI, Google Ads) because those networks use their own first-party cookies (`_fbc`, `_gclid`). Partner S2S tracking uses a custom parameter that has no cookie-based fallback — it only exists in the landing URL the partner appended it to. Developers treat it like a gclid and assume enrichment handles it; it does not.
+`purchase_completed` and `pap_payment_completed` both explicitly set `eventId: "purchase:<paymentId>"` (or equivalent) specifically to defeat the minute-bucket fallback — this was a deliberate v1.3 design decision, documented in code comments, not the dispatcher's default behavior. It is easy to write a new call site by copy-pasting the `TrackingEvents.purchaseFailed({...})` call shape without also copying the `eventId` line, since the helper signature doesn't force it (it's optional).
 
 **How to avoid:**
-Store `partnerClickId` on two durable documents at first-touch:
-1. On the User document at registration — so signup postback can read it.
-2. On the Payment document at checkout creation — so purchase postback can read it even from a gateway callback where `req` is unavailable.
-
-The conversion webhook adapter must be updated to load `partnerClickId` from the Payment or User document when the payload does not carry it. Do not rely solely on the `enrichClickIds()` middleware path for partner clickids.
+Set `eventId: \`purchase_failed:${String(payment._id)}\`` (mirroring the exact `"purchase:<paymentId>"` pattern used by `emitTrackingPurchaseCompleted`) on every failed/expired call site. Since a single Payment document has a single terminal-failure transition in its lifecycle (a doc doesn't flip from Expired back to Pending back to Expired again — retries create NEW Payment docs per the codebase's PAP-retry pattern seen at `payment.service.modular.ts:2696-2708`), keying purely on `paymentId` is sufficient — do not add a timestamp or attempt counter into the key.
 
 **Warning signs:**
-- Partner dashboard shows registrations with no corresponding conversions.
-- `ConversionWebhookDeliveryLog` shows `purchase_completed` events dispatched but partner reports 0% attribution.
-- `payload.gclid` is populated (cookie survived) but the S2S clickid field is empty.
+Query `TrackingEventLog` grouped by `(eventName: "purchase_failed", userId)` — any burst of >1 log row within a short window for the same user, each with a DIFFERENT `eventId` value, indicates the minute-bucket fallback fired instead of a stable key.
 
-**Phase to address:** Phase 1 (data model) — add `partnerClickId` to User and Payment schemas before writing any postback dispatch logic.
+**Phase to address:**
+Same phase/PR that adds the first failed/expired event-fire call — this is not a follow-up hardening task. It must be part of the review checklist for that PR (grep the diff for `TrackingEvents.purchaseFailed(` and confirm every call includes an explicit `eventId`).
 
 ---
 
-### Pitfall 2: Dual Dispatch Path — ConversionWebhookEventsService and TrackingEvents Both Active
+### Pitfall 2: Wiring the event on ANY `status → "expired"` transition instead of only genuine payment-failure transitions — fires false "purchase failed" events for successful PAP purchases
 
 **What goes wrong:**
-The codebase has two independent dispatch paths that both reach the same `conversionWebhook` destination:
+`payment.service.modular.ts` sets `status: "expired"` in at least two places that are NOT payment failures:
+- Line 1451 — a redundant/duplicate PAP funded-leg payment doc is marked expired as a double-click guard; the underlying purchase succeeded (the sibling doc is `status: "completed"`).
+- Line ~2704 (free/$0 PAP path) — stale `pending`/`processing` FREE PAP attempts are superseded to `"expired"` purely to unblock a fresh retry; this is bookkeeping cleanup, not a customer-facing failure.
 
-1. **Legacy path** (`Admin/ConversionWebhook/conversion-webhook-events.service.ts`): `ConversionWebhookEventsService.onChallengePassed()`, `onKYCCompleted()`, etc. These call `ConversionWebhookService.dispatch()` directly. `buildPayload()` generates a fresh `crypto.randomUUID()` on every call (line 101 of `conversion-webhook.service.ts`), so two invocations produce two distinct eventIds — both are delivered to the partner with no dedup.
+If the new tracking hook is implemented generically (e.g., a Mongoose middleware watching for any write where `status` becomes `"expired"`, or a shared helper called from every `Payment.updateOne(..., {$set: {status: "expired"}})` site without distinguishing WHY), it will fire a "purchase failed" Klaviyo event for these two paths even though the user's purchase actually succeeded. This directly corrupts marketing segment quality — a customer who successfully became funded via PAP could land in a "failed purchase — win them back" flow. This is the exact mechanism behind the ticket's reported symptom of a client having both a completed and an expired payment for the same attempt — that's a correct, intentional artifact of the concurrency guard, not evidence of a double-charge or a real failure.
 
-2. **Tracking path** (`Tracking/destinations/conversion-webhook.ts`): routes through `dispatch()` → `reserveLogRow()` → compound unique-index dedup on `TrackingEventLog`. This path IS idempotent.
-
-If both paths remain active for the same lifecycle event, the partner receives a double postback on every occurrence. A Stripe webhook retry or idempotent re-processing of a funding queue entry is enough to trigger this.
-
-**Why it happens:**
-The Tracking adapter wraps the old `ConversionWebhookService.deliverPayload()` method, giving the impression the old delivery is guarded. It is not: the old path bypasses the `TrackingEventLog` dedup table entirely.
+**Why it happens:** The `Payment.status` field reuses the string `"expired"` for two semantically different things: (a) a genuine TTL timeout where the customer never completed payment, and (b) an internal "supersede this redundant/duplicate doc" marker used purely for concurrency control. This overload is not obvious from the schema/interface alone — it only becomes visible by reading the call sites, which is exactly what this research did.
 
 **How to avoid:**
-For each event that will emit an S2S postback, pick one dispatch path and disable the other. The Tracking path (with `TrackingEventLog` dedup) is the correct long-term path. Legacy `ConversionWebhookEventsService` static methods that overlap must be removed or gated once the Tracking path covers those events. Audit with: `grep -rn "ConversionWebhookEventsService\." pft-backend/src` to find all call sites.
+Do not hook tracking dispatch generically off "any doc that is now `status: expired`." Instead, fire the failed/expired tracking event explicitly and only from the specific code path that legitimately represents a real expiry/failure for the CUSTOMER — primarily `CronService.checkAndExpirePendingPayments` (the genuine TTL-timeout path) — and explicitly exclude the two supersede/dedup-guard call sites in `payment.service.modular.ts`. If a shared "fire failed event" utility is built (mirroring `emitTrackingPurchaseCompleted`), give it an explicit `reason` parameter and have call sites pass it deliberately, rather than inferring "why" from the resulting status string alone; consider a guard analogous to the existing PAP-skip guard (`payment.payAfterPass === true && payment.currentProgramId` in `trackingPurchaseEmit.ts:65`) that suppresses the failed event specifically when a sibling `status: "completed"` doc exists for the same user/program (mirroring the exact check already performed at line 1436-1446 before the doc is expired).
 
 **Warning signs:**
-- Partner dashboard shows 2x registration or conversion counts compared to internal metrics.
-- `ConversionWebhookDeliveryLog` shows two `success` entries per user/event with different `eventId` values within seconds of each other.
+Cross-reference `TrackingEventLog` rows with `eventName: "purchase_failed"` against the `Payment` collection: for each, check whether a sibling Payment doc for the same `userId` + `currentProgramId`/`programId` reached `status: "completed"` within a short window. Any non-trivial rate of "failed event fired, but user also has a completed purchase for the same program around the same time" indicates this pitfall is live.
 
-**Phase to address:** Phase 1 (dispatch architecture) — establish which path owns each event before adding any new postback calls.
+**Phase to address:**
+Must be designed in the same phase that decides WHERE to hook the failed/expired event (the phase that touches `cron.service.ts` and/or `payment.service.modular.ts`/`callback.service.ts`), not deferred — this is a trigger-condition design decision, not a bug that can be patched after the fact without re-auditing every call site again.
 
 ---
 
-### Pitfall 3: PAP and Free-Trial Funnels Bypass the Normal Purchase Path
+### Pitfall 3: Reading `payment.usdAmount` for the failed/expired payload without accounting for the un-converted fallback — reintroduces the JPY-as-USD bug, likely at a HIGHER rate than the original completed-purchase bug
 
 **What goes wrong:**
-Partner S2S tracking typically expects: click → signup postback → purchase postback. In this platform:
+`payment.model.ts`'s `pre("validate")` hook backfills `usdAmount = this.amount ?? this.totalPrice ?? 0` (no currency conversion) whenever `usdAmount` is missing at save time. This is explicitly a legacy-doc safety net, but it applies to ANY doc, old or new, that reaches save/validate without an explicit converted `usdAmount` already set. Completed payments reliably get a real converted `usdAmount` because a gateway webhook handler runs a full completion flow (which, per the v1.3 fix, explicitly computes/verifies it). A payment that dies at Pending → Expired via the TTL cron, however, may never have passed through that conversion step at all if the currency-conversion logic is tied to a later stage of the checkout/webhook flow rather than to checkout creation — meaning expired payments are structurally MORE likely to carry a raw, non-USD-converted `amount` value in `usdAmount` than completed ones ever were.
 
-- **PAP free signup** (`pap_free_signup`): the trader pays nothing upfront. The signup is tracked but there is no `purchase_completed`. The PAP payment later (`pap_payment_completed`) is a separate event — currently disabled for `conversionWebhook` in `tracking.constants.ts` line 59 (`conversionWebhook: false`). If the partner contract counts "conversion" as a purchase, PAP traders will never be counted.
-- **Free trial / free challenge**: `free_trial_signup` and `free_challenge_signup` are enabled for `conversionWebhook` by default (lines 44–46 of `tracking.constants.ts`), so they fire registration postbacks. But they have $0 value. If the partner network interprets the conversion as a sale, $0 events can trigger fraud filters or commission rejection.
-- **PAP funded-leg payment**: the funded-leg payment currently provisions the funded account immediately after payment, skipping the KYC/funded-stage approval gate (documented in `project_pap_funded_kyc_bypass.md`). If an `account_funded` postback fires here, it fires before KYC completes — a partner expecting KYC-gated conversions sees incorrect attribution timing.
-
-**Why it happens:**
-Postback integration is typically designed around the happy-path direct-purchase funnel and bolted onto alternate paths inconsistently. The multiple account-acquisition paths (direct purchase, PAP, free trial, free challenge) each have subtly different state machines.
+**Why it happens:** The `usdAmount` fallback was added as a generic defensive measure for an unrelated legacy-data problem ("Payment validation failed: usdAmount is required" per the code comment), not written with the failed/expired tracking use case in mind. It silently produces a plausible-looking number (not an error, not null) so there's nothing that surfaces the problem at the call site — it will look like a normal `value` field in the Klaviyo payload.
 
 **How to avoid:**
-Explicitly define which events map to "registration postback" and "conversion postback" in the partner contract, then trace every funnel path:
-- Direct purchase: `signup_completed` → `purchase_completed`
-- PAP: `signup_completed` (or `pap_free_signup`) → `pap_payment_completed` (must be enabled for `conversionWebhook`)
-- Free trial/challenge: `signup_completed` only, or a custom lead event with $0 value; confirm partner accepts $0-value conversions
-- Funded path: fire `account_funded` postback only after KYC gate clears, not at payment time
-
-For the PAP case specifically: if the partner pays CPA on funded accounts, the postback event should be `account_funded`, not `pap_payment_completed`, because the KYC/funded-queue gate is what confirms the account is real.
+- Do not read `payment.usdAmount` blindly for the failed/expired event. Before emitting, check whether the value looks like it went through real conversion (e.g., compare `payment.currency !== "USD" && payment.usdAmount === payment.amount` as a heuristic red flag — mirroring the exact heuristic already used for the JPY PAP bug per project memory: `payAfterPassRemainingPrice > 10000`).
+- Prefer explicitly calling the same currency-conversion utility (`CurrencyService.convertToUsd`, referenced in `payment.service.modular.ts` around the `PAP_SANE_MAX_USD` guard) rather than trusting whatever is currently stored in `usdAmount` on a payment that never completed.
+- Add a unit/integration test: create a Pending Payment doc with `currency: "JPY"`, `amount: 356296`, no explicit `usdAmount` set, let it expire via the cron, and assert the emitted tracking event's `value`/`currency` fields are NOT `356296`/`"USD"`.
+- If a genuinely converted `usdAmount` cannot be produced for a given expired/failed doc (no FX rate available at that stage), prefer omitting the `value` field entirely (or flagging it) over sending a wrong number — a missing value is far less damaging to marketing data than a wrong one.
 
 **Warning signs:**
-- Partner reports conversion numbers that don't match challenge purchase + PAP payment numbers.
-- $0-value conversion events rejected by partner network.
-- `pap_payment_completed` events never appearing in partner dashboard even though internal logs show them dispatched.
+Sweep `TrackingEventLog`/Klaviyo delivery data for `purchase_failed` events where `currency === "USD"` but `value` is implausibly large relative to the brand's typical challenge price (same detection heuristic as the existing JPY payout bug sweep, e.g. `value > 10000` in a USD-priced-challenge context).
 
-**Phase to address:** Phase 1 (event mapping spec) — document the exact event-to-postback mapping per funnel type before implementation.
+**Phase to address:**
+Same phase as building the failed/expired payload — treat "reuse the existing normalized-USD-amount pattern, do not add a new amount-extraction path" as an explicit code-review gate for that PR, exactly as was true for `purchase_completed`/`pap_payment_completed`.
 
 ---
 
-### Pitfall 4: Refund/Chargeback Fires Conversion Then Never Cancels It
+### Pitfall 4: PAP funded-leg failure/timeout paths have no equivalent to `pap_payment_completed` today — a failed-event addition scoped only to the main flow will miss them entirely
 
 **What goes wrong:**
-`purchase_completed` fires a conversion postback. If the payment is later refunded (PayPal `PAYMENT.CAPTURE.REFUNDED`, Oxapay `refunded` status) or charged back, no cancellation postback is sent to the partner. The partner pays commission on a sale that was returned. At scale this is a material fraud vector — one class of prop-firm fraud is buying a challenge, triggering the commission, then immediately requesting a refund.
+`purchase_completed` (skipped for PAP) and `pap_payment_completed` (fired instead) are wired at 5 real call sites across `fanbasis-webhook.service.ts` (x2), `stripe-webhook.service.ts`, `callback.service.ts`, and the free/$0 path in `payment.service.modular.ts` — each PAP funded-leg completion path independently calls `TrackingEvents.papPaymentCompleted(...)`. There is **no `papPaymentFailed`/`pap_payment_failed` equivalent defined anywhere** — not in `EVENT_NAMES`, not in `tracking.events.service.ts`. If v1.4 adds failed/expired tracking only for the STANDARD purchase flow (the flow the ticket's own example came from) via the generic `purchase_failed` event, PAP funded-leg payment failures/expiries will remain completely untracked — a customer whose PAP final-payment attempt fails or expires will generate no Klaviyo signal at all, even though the analogous SUCCESS path (`pap_payment_completed`) is fully tracked. This is a direct parallel to why `purchase_completed` needed multiple separate wiring points in v1.3 — PAP funded-leg logic is genuinely scattered across gateway-specific webhook handlers rather than funneling through one shared function.
 
-Confirmed in codebase: `paypal-webhook.service.ts` handles `PAYMENT.CAPTURE.REFUNDED` and marks the payment as refunded (logs "Payment marked as refunded" at line 579) but dispatches no `TrackingEvents.*` call and no `dispatchConversionWebhook` call in that branch.
-
-**Why it happens:**
-Refund events are treated as payment state changes, not as marketing events. The tracking module was designed around forward-only lifecycle events. Nobody adds a "reversal postback" path when building the forward path.
+**Why it happens:** PAP's payment-completion logic already required per-gateway wiring because there's no single shared "PAP payment succeeded" function — each gateway webhook handler (fanbasis, stripe, generic callback) independently detects the PAP condition (`payment.payAfterPass && payment.currentProgramId`) and calls the PAP-specific event. The same fragmentation almost certainly applies to failure: each gateway's webhook handler likely has its OWN way of marking a PAP payment as failed/declined (or relies solely on the generic expiry cron), with no shared code path to hang a single tracking call off of.
 
 **How to avoid:**
-Add a `purchase_reversed` event (or reuse `purchase_failed` with a `reason: "refunded"` property) and emit it from every refund/chargeback handler. The S2S adapter must send a cancellation postback for any event that was previously sent for that `orderId`. Check the partner network's spec for the correct reversal signal — most S2S networks accept a `status=rejected` or `status=reversed` on a second postback to the same clickid/orderId.
-
-If the partner network does not support reversals, document this as a known gap and require manual reconciliation. Do not silently let commissions stand on refunded purchases.
+- Before implementation, explicitly grep for `payment.payAfterPass && payment.currentProgramId` (the PAP-detection guard used consistently at all known completion sites) inside each gateway webhook handler and trace whether that handler has an equivalent "payment declined/failed" branch alongside its completion branch — audit `fanbasis-webhook.service.ts`, `stripe-webhook.service.ts`, and `callback.service.ts` individually, not just the shared `cron.service.ts` TTL path (the cron only catches "never completed," not "gateway explicitly declined").
+- Decide explicitly: does a failed/expired PAP funded-leg payment need its own `pap_payment_failed` event name (mirroring the completed/failed split that exists for the standard flow), or is `purchase_failed` + a `payAfterPass`/`programType` flag in `properties` sufficient? Given `pap_payment_completed` was kept deliberately distinct from `purchase_completed` (per the code comment: "This is the signal Klaviyo uses to EXIT the PAP recovery flow"), symmetry strongly suggests PAP failures should also be distinguishable from standard failures, likely via a new `pap_payment_failed` event name added consistently across all 3 tracking files (see Pitfall 5) rather than overloading `purchase_failed`.
+- Cross-reference against the existing PAP funded queue gate finding (project memory: PAP funded-leg "Program Not Assigned" is usually a KYC/contract-gate hold, NOT a failed payment) — a PAP funded-leg payment that succeeded but is stuck behind KYC/contract approval must NOT be misclassified as a failed/expired payment by whatever new detection logic is added; the trigger condition must be the `Payment.status` field transitioning to `failed`/`expired`, never a downstream `fundedprogressionqueue` hold state.
 
 **Warning signs:**
-- Partner commission reports show higher revenue than actual net revenue (refunds not subtracted).
-- Refund rate in payment provider dashboard does not correspond to any reduction in partner-reported conversions.
+Query `Payment` documents where `payAfterPass === true` and `status` is `failed` or `expired` over a recent window; if this count is non-trivial while `TrackingEventLog` has zero `pap_payment_failed`/`purchase_failed` rows referencing PAP payments, the PAP failure path is confirmed untracked.
 
-**Phase to address:** Phase 2 (reversal postback) — can be deferred past MVP but must be scoped before go-live if the partner contract has a refund clawback clause.
+**Phase to address:**
+Give this its own explicit checklist/sub-phase item — "audit PAP funded-leg gateway handlers for a failure-tracking equivalent to pap_payment_completed" — rather than folding it silently into "add purchase_failed to the main flow." This mirrors how v1.3's PAP purchaseCompleted wiring needed deliberate site-by-site verification, not a single generic implementation task.
 
 ---
 
-### Pitfall 5: Multi-Currency — JPY Amount Sent as Numeric Value Without Currency Guard
+### Pitfall 5: Adding a new event name (e.g., `purchase_expired` or `pap_payment_failed`) requires touching 3 separate files in lockstep — missing one produces a specific, easy-to-miss silent failure mode
 
 **What goes wrong:**
-Trading Cult bills Japanese traders in JPY. The platform has a documented history of the PAP funded-leg leaking the raw JPY figure (e.g. ¥356,296) into a USD-denominated field (`project_pap_jpy_charged_as_usd.md`). The same risk applies to S2S postback value fields. If the postback payload uses `payload.value` directly without checking `payload.currency`, the partner network receives "356296" with no currency context — or worse, interprets it as a USD sale of $356,296.
+A new `EventName` must be added to ALL of: (1) `EVENT_NAMES` array in `tracking.interface.ts`, (2) `DEFAULT_EVENT_TOGGLES` in `tracking.constants.ts`, (3) `EVENT_MAPPING` in `tracking.constants.ts`. Each has a different failure mode if skipped:
+- Skip (1): TypeScript compile error (`EventName` union missing the value) — loud, caught immediately. Low risk.
+- Skip (2) or (3): both `DEFAULT_EVENT_TOGGLES` and `EVENT_MAPPING` are typed as `Record<EventName, ...>`, so TypeScript's exhaustiveness check SHOULD catch a missing key at compile time too — the real risk in practice is not a missing key but a **copy-pasted row with a wrong value**, e.g. duplicating `purchase_completed`'s row for the new event and forgetting to change `klaviyo: "Placed Order"` to a distinct metric name. This compiles cleanly and produces no runtime error — it just silently sends the new event under an existing metric name, corrupting that metric's counts in Klaviyo.
+- At runtime, if `EVENT_MAPPING[payload.eventName]?.klaviyo` were ever undefined (e.g., a values-only object literal missing the `as const` exhaustiveness protection in a refactor), `klaviyoAdapter.send()` returns `{status: "skipped", error: "no klaviyo metric for ..."}` — a normal, no-throw skip with no alarm bell, not an exception.
 
-Most partner S2S networks require a `sale_amount` and `currency` pair. If `currency` is omitted or defaults to USD, the number is treated as USD. A ¥10,000 challenge (approximately $65) reported as $10,000 will trigger fraud detection and may result in the account being flagged or commission clawed back en masse.
+**Why it happens:** There's no single source-of-truth registry beyond the `Record<EventName, ...>` typing convention — TypeScript catches missing KEYS but cannot catch a syntactically-valid but semantically-wrong VALUE (e.g., a copy-paste artifact).
 
-The `ConversionWebhookEventsService.onPayoutCompleted()` passes `amount` and `currency` explicitly (lines 69–70 of `conversion-webhook-events.service.ts`), which is correct. But `TrackingEvents.purchaseCompleted()` accepts `value?: number` and `currency?: string` as optional fields — a caller that omits `currency` will dispatch the postback without it.
+**How to avoid:** If reusing `purchase_failed` (already fully wired, just never called) rather than adding a new event name, this entire pitfall is avoided — this is the strongest argument for reusing the existing scaffold with a `reason: "expired"` vs `reason: "declined"` distinguishing field rather than inventing `purchase_expired` as a new event name. If a genuinely new event name is still needed (e.g. for PAP, per Pitfall 4), rely on the TypeScript `Record<EventName, ...>` exhaustiveness check for missing keys, but ALSO manually diff the new row against `purchase_completed`'s/`pap_payment_completed`'s row in code review to confirm the Klaviyo metric name (and GA4/FB event name) are genuinely distinct, not copy-paste leftovers.
 
-**How to avoid:**
-- Make `currency` a required field (not optional) on any postback payload builder that includes `value`/`sale_amount`.
-- Add a guard in the S2S adapter: if `value` is set and `currency` is absent, return `status: "skipped"` with a logged error rather than sending a postback with ambiguous currency.
-- For JPY specifically: confirm the partner network accepts JPY as a currency code. Some networks only accept USD and will reject or silently redenominate. If USD is required, convert at dispatch time using a live or daily-snapshot rate — not the raw JPY figure.
-- When reading from the Payment doc, always use `usdAmount` for USD-denominated partner reporting, or use `currency + paidAmount` as a pair and never split them.
+**Warning signs:** `tsc`/build failure listing missing keys (if using a new event name) is the fast, loud signal for a missing key — trust it. The silent failure mode is specifically the "value copy-pasted from an existing row" case, which only shows up as `EVENT_MAPPING["your_new_event"].klaviyo === "Placed Order"` (or similar) in a code review diff, or as duplicate-looking metric names inside the Klaviyo dashboard after the fact.
 
-**Warning signs:**
-- Unusually large sale values in partner dashboard for JP traders.
-- Partner fraud team flags the account for suspicious high-value conversions.
-- `currency` field missing from `ConversionWebhookDeliveryLog.payload` entries.
-
-**Phase to address:** Phase 1 (payload schema) — currency must be required in the postback schema before any JP funnel traffic is tracked.
-
----
-
-### Pitfall 6: ConversionWebhookSettings is a Singleton — No Brand Guard
-
-**What goes wrong:**
-`ConversionWebhookService.getSettings()` does `ConversionWebhookSettings.findOne()` with no brand filter. The schema has no `brandId` field. Because the platform uses per-DB separation, this is fine as long as the `conversionWebhook` destination is configured in the correct brand's DB. However, the `TrackingSettings` model (which controls the adapter within the Tracking path) also has no `brandId` — it scopes by `environment` only.
-
-The risk: if Trading Cult's `webhookUrl` is configured in the wrong brand's DB (admin mistake), or if two brands share a staging MongoDB, all those brands' conversion postbacks go to Trading Cult's endpoint. The partner receives conversions from users who never clicked their ad.
-
-**Why it happens:**
-The existing webhook infrastructure was built for single-brand use. Per-DB separation is assumed to provide brand separation at the infrastructure level, so no brand guard was added in code.
-
-**How to avoid:**
-- Document explicitly: `conversionWebhook.webhookUrl` must only be configured in Trading Cult's DB. Add this as a tooltip in the admin UI.
-- Add a `brandSlug` or `PROJECT_ID` assertion in the S2S adapter: before firing, verify `process.env.PROJECT_ID` matches the expected brand identifier. Return `status: "skipped"` with a logged warning if it does not.
-- This check is cheap and prevents cross-brand pollution even if someone misconfigures.
-
-**Warning signs:**
-- Partner reports conversions from emails that are not Trading Cult users.
-- Other brands' admins see unexpected webhook activity in their delivery logs.
-
-**Phase to address:** Phase 1 (brand guard) — add the check before the first deploy.
-
----
-
-### Pitfall 7: The "Minimal One-Off" Trap — Hardcoding That Blocks Verification and Reuse
-
-**What goes wrong:**
-The stated scope is "minimal one-off for the Trading Cult partner." The classic failure mode: the postback URL is hardcoded in application code (not in `ConversionWebhookSettings`), the event mapping is hardcoded to Trading Cult's specific parameter names, and there is no admin UI toggle to disable or test it. This means:
-- There is no way to verify a deploy worked without live partner traffic.
-- When a second partner is onboarded, the one-off code creates a second one-off alongside the first, and they diverge.
-- When Trading Cult changes their postback URL or adds a parameter, it requires a code deploy.
-
-The existing `ConversionWebhookSettings` model with `webhookUrl`, `webhookSecret`, and per-event toggles is the correct abstraction. The S2S clickid postback should extend this model (add `clickidParam` name, `postbackUrlTemplate`) rather than adding a parallel hardcoded system.
-
-**How to avoid:**
-- Store the partner postback URL template in `ConversionWebhookSettings` (or a new `PartnerPostbackSettings` collection that follows the same pattern).
-- The template should support macro substitution: `{clickid}`, `{sale_amount}`, `{currency}`, `{status}` — so URL changes don't require a code deploy.
-- Keep the per-event toggle system: disable postback for specific events via admin UI without touching code.
-- Use the existing `ConversionWebhookService.testWebhook()` as the model for a test-postback button that fires without real user data.
-
-**Warning signs:**
-- Partner postback URL appears as a string literal in source code.
-- No way to send a test postback from the admin panel.
-- A partner URL change requires a git commit.
-
-**Phase to address:** Phase 1 (configuration schema) — make the URL a DB-stored template before writing any dispatch logic.
-
----
-
-### Pitfall 8: No Retry on Partner 5xx — Failed Postback Is Silently Lost
-
-**What goes wrong:**
-`ConversionWebhookService.deliverPayload()` makes one HTTP POST with a 15-second timeout (line 152 of `conversion-webhook.service.ts`). If the partner's endpoint returns a 5xx or times out, the result is marked `failed` in `ConversionWebhookDeliveryLog` and nothing else happens. The `TrackingEventLog` also marks it `failed`, which per the dedup service comment ("failed → allow re-attempt") means a retry is permitted — but there is no retry scheduler. The failed event sits in the log forever and the partner never receives the postback.
-
-For a partner paying CPA commissions, a missed postback means a missed payment.
-
-**Why it happens:**
-Fire-and-forget dispatch (correct: never block the user request path) is being conflated with fire-and-never-retry. The dedup system already supports retry semantics — `failed` status intentionally allows re-dispatch — but no retry worker was wired up.
-
-**How to avoid:**
-Add a cron job that queries `TrackingEventLog` for rows in `status: "failed"` with `destination: "conversionWebhook"` older than 2 minutes and younger than 24 hours, then re-dispatches. Cap at 3–5 attempts. Use exponential backoff (2m, 10m, 60m). The compound unique index on `(eventId, destination)` prevents duplicate inserts; the `failed` path in `isDuplicate()` correctly allows re-dispatch.
-
-**Warning signs:**
-- `ConversionWebhookDeliveryLog` shows `failed` entries that never become `success`.
-- Partner dashboard shows gaps in attribution during periods where their endpoint was briefly down.
-
-**Phase to address:** Phase 2 (retry worker) — add after initial dispatch is verified working.
-
----
-
-### Pitfall 9: GET vs POST, URL-Encoding, and Macro Substitution Errors
-
-**What goes wrong:**
-Most partner S2S postback specs use GET with URL parameters (`https://partner.example.com/postback?clickid={clickid}&status=1&amount={amount}`). The existing `ConversionWebhookService.deliverPayload()` sends POST with a JSON body. If the partner expects GET, the postback will be silently ignored — many S2S platforms return 200 on GET even when they receive a POST with the wrong format, making this failure invisible.
-
-URL macro substitution errors are also common: if `{clickid}` contains `+`, `/`, `=`, or other URL-special characters (base64-encoded click IDs are common), they must be `encodeURIComponent()`-ed before substitution. Failure to encode produces a malformed URL or a clickid that is corrupted in transit.
-
-**Why it happens:**
-Developers write `url.replace('{clickid}', clickid)` without encoding. The partner's spec may say "GET" on page 3 of a PDF that nobody read past page 1.
-
-**How to avoid:**
-- Read the partner's S2S spec carefully and confirm GET vs POST before writing any code.
-- If GET: build the URL with `new URL(template)` and `searchParams.set()` — this handles encoding automatically. Do not use string concatenation.
-- If POST: confirm the partner accepts JSON (most modern networks do; some expect `application/x-www-form-urlencoded`).
-- Test with a real clickid that contains URL-special characters.
-
-**Warning signs:**
-- Partner's test endpoint returns 200 but no conversion appears in their dashboard.
-- Clickid in partner dashboard is truncated or garbled for certain users.
-
-**Phase to address:** Phase 1 (HTTP client implementation) — validate encoding before any live traffic.
-
----
-
-### Pitfall 10: Cross-Device / Delayed-Purchase Clickid Loss
-
-**What goes wrong:**
-A user clicks a partner ad on mobile, lands on the registration page, but completes signup on desktop 20 minutes later (cross-device). The clickid exists only in the mobile session cookie and URL. The desktop signup request has no cookie and no clickid in the query string. If clickid persistence relies only on `req.cookies` and `req.query` at signup time, the partner postback fires without a clickid.
-
-This is distinct from Pitfall 1 (which covers delayed purchase after signup). Here the gap is between the ad click and the signup itself.
-
-**How to avoid:**
-- Pass the clickid from the frontend to the signup API request body explicitly. The landing page should capture the partner clickid from the URL and store it in `localStorage` (survives page navigations and cross-tab, unlike cookies which are domain-scoped). The signup form submission should include it in the request body.
-- The backend signup handler should read `partnerClickId` from the request body (not just from cookies) and store it on the User doc.
-- Define an attribution window with the partner (typically 30 days for registration, 7 days for conversion). Do not attempt to retroactively attribute signups from before the clickid was captured.
-
-**Warning signs:**
-- Mobile-heavy brands show lower attribution rates than desktop-heavy brands.
-- Partner clickid appears in landing page analytics but not in signup postback events.
-
-**Phase to address:** Phase 1 (frontend clickid capture) alongside backend User doc storage.
+**Phase to address:** Scope decision (reuse `purchase_failed` vs. new event name) belongs in the same phase as the payload/trigger design (Pitfall 2/4), since it affects which files get touched at all.
 
 ---
 
@@ -253,104 +129,75 @@ This is distinct from Pitfall 1 (which covers delayed purchase after signup). He
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Hardcode postback URL in code | Ship faster, no admin UI needed | URL change = deploy; second partner = second hardcode; no test button | Never — store in `ConversionWebhookSettings` |
-| Fire postback only from `signup_completed`, skip PAP/free paths | Simpler mapping | PAP traders never attributed; partner data wrong | Only if partner contract explicitly excludes PAP and free programs |
-| Omit `currency` from postback, assume USD | Less code | JPY amounts appear as inflated USD; fraud flags from partner | Never — always send currency code |
-| Skip retry worker, mark failed and move on | No cron complexity | Silent missed postbacks; lost commissions | Acceptable in v1 only if monitored and manually retried |
-| Use `ConversionWebhookEventsService` legacy path for new events | Reuses existing code | Bypasses dedup; double-fires on retry; no idempotency | Never — use Tracking path with dedup |
-
----
+| Fire `purchase_failed` from a generic Mongoose `post("save")`/`post("updateOne")` hook watching `status → expired/failed` on the Payment model | Fast to implement, one hook covers every call site | Fires for the two non-failure "supersede/dedup-guard" expiry paths identified above (Pitfall 2); very hard to selectively suppress from inside a generic hook without re-adding the exact PAP-sibling-check logic that already exists at the call sites | Never — always fire explicitly from the specific business-logic path that represents a genuine customer-facing failure, exactly as `emitTrackingPurchaseCompleted` is called explicitly from each completion site rather than via a generic hook |
+| Reuse `payment.usdAmount` as-is for the failed-event `value` field without re-verifying it went through real FX conversion | No new code needed, matches the completed-event pattern superficially | Reintroduces JPY-as-USD for the subset of expired/failed payments that never reached the conversion step (Pitfall 3) | Only acceptable if `usdAmount` is independently confirmed to be populated via explicit conversion (not the model's raw fallback) for every payment status, including `pending`/`expired` — needs verification, not assumption |
+| Add `purchase_expired` as a brand-new event name instead of reusing `purchase_failed` + a `reason` field | Cleaner semantic separation in Klaviyo's event list | Triples the file-sync surface area (Pitfall 5) for marginal value, since `purchase_failed` already has full scaffolding including a Klaviyo mapping that's never been used | Only if there's a strong product reason two genuinely distinct Klaviyo metrics are needed for flow-branching purposes that a `reason` property filter can't achieve (Klaviyo flow triggers CAN filter on event properties, so this is rarely necessary) |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Partner S2S endpoint | Send POST when spec requires GET | Read spec; use GET + `URL.searchParams` for macro substitution |
-| Partner S2S endpoint | Omit `clickid` when it is empty/null — send postback anyway | Return `status: "skipped"` — never send postback without a valid clickid; the partner cannot attribute it and it may pollute their fraud scoring |
-| Partner S2S endpoint | Treat HTTP 200 as success | Some networks return 200 for all requests; check the response body for an `"ok"` or error field per partner spec |
-| Partner S2S endpoint | Use same postback URL for registration and conversion | Registration and conversion are typically separate postback calls with different `status` values; confirm per partner spec |
-| `ConversionWebhookSettings` | Configure in wrong brand's DB | Assert `PROJECT_ID` matches expected brand slug before dispatch |
-| `PaymentAttribution` | Read `gclid`/`ttclid` as proxy for partner clickid | Partner clickid is a separate field (`sub1`, `clickid`, etc.) — do not conflate with ad-platform click IDs |
-
----
+| Klaviyo Events API (`destinations/klaviyo.ts`) | Assuming `reason`/`errorCode` on the payload automatically reach Klaviyo because they're typed fields on `ITrackingEventPayload` | They do NOT — `buildProperties()` only maps a fixed allowlist of fields (program_id, account_size, challenge_type, etc.) into Klaviyo `properties`; `reason` and `errorCode` must be explicitly added to that allowlist in `buildProperties()` or they silently never appear in the Klaviyo event, even though the field exists on the payload type |
+| Klaviyo Events API — email requirement | Assuming every failed/expired Payment doc has `payment.billingInfo.email` populated by the time it expires | Klaviyo adapter skips (silently, `status: "skipped"`) any event with no email; very-early-abandoned Pending payments (created before email capture) will never reach Klaviyo for this event — this may be an acceptable gap but should be a deliberate decision, not a surprise found in production |
+| Dispatcher dedup (`tracking.service.ts` / `dedup.service.ts`) | Assuming the dedup log automatically prevents duplicate failed-event dispatch across retries without an explicit `eventId` | Dedup is keyed on `eventId`; without an explicit stable key, the minute-bucket fallback only protects against duplicates within the same 60-second window, not across a longer retry gap or cron re-run |
+| PAP funded-leg gateways (fanbasis/stripe/generic callback) | Assuming one shared "PAP failed" hook exists to parallel the one shared PAP-skip guard used for completions | No such shared failure path currently exists — `payAfterPass && currentProgramId` detection for FAILURE (not completion) must be independently verified/added per gateway handler |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Postback on user request path (synchronous) | Signup or purchase hangs for 15 seconds on partner 5xx | Always use fire-and-forget (`fireAndForget` pattern already in `tracking.events.service.ts`) | Immediately at first partner timeout |
-| Loading `ConversionWebhookSettings` from DB on every dispatch | DB hit per postback; slow dispatch at volume | Apply same 30-second in-process cache pattern used in `TrackingSettings.loadSettings()` | At approximately 50 purchases/minute without caching |
-| `TrackingEventLog` full-collection scan for retry worker | Retry cron slows down as log grows | Add compound index on `(destination, status, createdAt)` before shipping retry worker | At approximately 100K log rows |
-
----
+| Re-scanning all `status: "expired"` docs on every cron tick to find "ones that still need a tracking event" (rather than firing inline in the same `updateMany` pass that performs the transition) | Growing DB read load on `payments` collection over time; delivery-log write volume disproportionate to actual new expiries per tick | Fire the tracking event only for the doc IDs that were JUST transitioned in that tick's pass (the current `checkAndExpirePendingPayments` already isolates `stalePayments` as exactly this set before the `updateMany` calls — hang the event-fire off that existing array, do not add a second separate query keyed on current status) | Becomes noticeable once the `payments` collection accumulates a large volume of historically-expired docs (abandoned-checkout volume is typically higher than completed-purchase volume across most funnels) |
+| Delivery-log (`TrackingEventLog`) volume growth | Failed/expired-event volume is likely higher than completed-event volume (declines/abandonment usually outnumber conversions) | No action needed immediately — the collection already has a unique-index-backed dedup design; just confirm indexing/retention is still adequate once this new higher-volume event type ships | Worth a quick capacity check before shipping, not a blocker |
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Logging `partnerClickId` in plaintext to application logs | Click IDs are attribution tokens; full exposure enables click injection attacks and may be PII in some jurisdictions | Truncate or omit clickid from debug logs; store only in the structured DB field |
-| Accepting partner postback URL from user-supplied input without validation | SSRF — malicious admin configures postback URL pointing to internal services | The existing `isHttpsUrl()` check is present; additionally add a private IP range blocklist before saving to settings |
-| Firing postback before payment is confirmed | Partner receives conversion that may never complete | Only dispatch postbacks from the confirmed-payment callback handler, never from `purchase_initiated` |
-| Sending postback without clickid and using a placeholder value | Partner double-counts on placeholder collisions | Return `status: "skipped"` when clickid is absent — do not substitute empty string or a constant |
+| Putting raw gateway decline messages (e.g., a Stripe `decline_code` or full error string, sourced from the existing `payment.errorMessage` field) directly into `errorCode`/`reason` without normalizing | Gateway error strings can occasionally embed sensitive/PII-adjacent details (partial card numbers in some legacy error formats, internal system paths) and get forwarded to a third-party (Klaviyo) | Normalize to a small closed vocabulary (`card_declined`, `gateway_timeout`, `expired_no_completion`, `fraud_hold`, etc.) rather than passing the gateway's raw message string through to `reason`/`errorCode` |
 
----
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Firing a marketing "you didn't complete your purchase" flow off a PAP-supersede/dedup-guard false-positive (Pitfall 2) | A customer who successfully became funded receives a "did your payment fail?" email — confusing and trust-eroding | Explicitly exclude the two non-failure `status: "expired"` call sites identified in `payment.service.modular.ts` (lines ~1451 and ~2704) from triggering the marketing event |
+| Sending a bare "purchase_failed" event with no `reason` populated | Marketer cannot differentiate "card declined, suggest retry" from "abandoned checkout, send reminder" from "fraud hold, do not re-engage" — reduces the event to noise | Populate `reason` from `payment.errorMessage` (already exists on the model) when present, normalized to a small enum; use a distinct value like `"expired_no_completion"` for pure TTL cron-driven expiry with no underlying gateway error |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **clickid storage on User doc:** `partnerClickId` field exists in the User schema and is populated during signup from request body (not only from cookies)
-- [ ] **clickid storage on Payment doc:** `partnerClickId` field exists in the Payment model and is stored at checkout creation, so gateway callbacks can still find it
-- [ ] **PAP funnel coverage:** explicit decision recorded in event-mapping spec about whether `pap_payment_completed` should be enabled for `conversionWebhook` (currently `false` in `tracking.constants.ts`)
-- [ ] **Free program coverage:** confirmed with partner whether `free_trial_signup`/`free_challenge_signup` postbacks should fire (they are currently `conversionWebhook: true` by default)
-- [ ] **Refund path checked:** every payment refund/chargeback handler (`paypal-webhook.service.ts`, `oxapay.service.ts`, `stripe-webhook.service.ts`) verified to emit a reversal postback or explicitly documented as out of scope
-- [ ] **Currency field required:** all postback builders that include `value` have `currency` as a required (non-optional) field
-- [ ] **Brand guard present:** `PROJECT_ID` assertion in S2S adapter returns `status: "skipped"` with logged warning on mismatch
-- [ ] **Test button works:** admin panel "Send test postback" button fires a synthetic postback with a fake clickid and confirms partner endpoint returns 200
-- [ ] **Dual-path audit complete:** `ConversionWebhookEventsService.*` call sites confirmed non-overlapping with `TrackingEvents.*` call sites for the same events
-
----
+- [ ] **`TrackingEvents.purchaseFailed(...)` is called from at least one real site:** Verify with a repo-wide grep post-implementation — as of this research it exists but is called from nowhere.
+- [ ] **Every new call site passes an explicit `eventId`:** Grep the diff for `TrackingEvents.purchaseFailed(` / any new PAP-failure helper and confirm each includes `eventId: \`purchase_failed:${paymentId}\`` (or equivalent) — do not rely on the minute-bucket fallback.
+- [ ] **`reason`/`errorCode` actually reach Klaviyo:** Confirm `destinations/klaviyo.ts`'s `buildProperties()` has been updated to `set("reason", payload.reason)` / `set("error_code", payload.errorCode)` — the fields existing on `ITrackingEventPayload` does NOT mean they're mapped through.
+- [ ] **The two non-failure `status: "expired"` call sites are excluded:** Confirm the PAP sibling-supersede path (`payment.service.modular.ts` ~line 1451) and the free-PAP stale-attempt supersede path (~line 2704) do NOT trigger the new failed/expired tracking event.
+- [ ] **PAP funded-leg failure paths are separately audited:** Confirm each of `fanbasis-webhook.service.ts`, `stripe-webhook.service.ts`, `callback.service.ts` has been checked for its own PAP-failure branch, not just the main-flow cron.
+- [ ] **JPY/non-USD amount test case exists:** A unit test asserting an expired JPY-currency Payment doc (with no explicit converted `usdAmount`) does not emit a raw-yen-as-USD value.
+- [ ] **Klaviyo event-name choice is deliberate:** Confirm whether the team decided to reuse `purchase_failed` (already fully scaffolded) vs. add new event name(s) — and if new names were added, confirm all 3 files (`EVENT_NAMES`, `DEFAULT_EVENT_TOGGLES`, `EVENT_MAPPING`) were updated with genuinely distinct values (not copy-paste artifacts from `purchase_completed`).
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| clickid not persisted, missed postbacks | MEDIUM | Query `ConversionWebhookDeliveryLog` for entries where postback was dispatched but no clickid in payload; cross-reference with Payment `attribution` subdoc; manually re-fire for affected records once field is added |
-| Double postbacks sent | HIGH | Partner must void duplicate commissions manually; audit `ConversionWebhookDeliveryLog` for pairs with same userId + event + timestamp proximity; disable legacy path immediately |
-| JPY sent as USD to partner | HIGH | Contact partner to void inflated conversions; fix currency guard; re-fire corrected postbacks; same recovery pattern as `project_pap_jpy_charged_as_usd.md` incident |
-| Refund not canceled at partner | MEDIUM | Export refunded payment IDs; manually send reversal postbacks via admin tool or one-off script; negotiate chargeback with partner if commission was already paid |
-| Postback firing to wrong brand's partner endpoint | HIGH | Disable `conversionWebhook` in affected DB immediately; audit partner dashboard for misattributed conversions; add brand guard before re-enabling |
-
----
+| Non-idempotent eventId caused duplicate Klaviyo events already sent | MEDIUM | Klaviyo events cannot be bulk-deleted/de-duplicated after ingestion easily; best recovery is fixing the eventId going forward and, if the duplicate volume materially affects a specific flow's trigger counts, manually excluding/suppressing the affected date range in that flow's segment logic rather than attempting historical cleanup |
+| False "purchase_failed" fired for the two non-failure expired-status paths, already delivered | LOW–MEDIUM | Identify affected Payment IDs via the sibling-completed-doc cross-reference query (see Pitfall 2 warning signs), then either suppress those specific customers from any automated win-back flow manually in Klaviyo, or (if volume is small) accept as noise while fixing the trigger condition going forward |
+| JPY-as-USD value already sent for failed/expired events | LOW | Same remediation pattern as the original v1.3 JPY bug: identify affected `TrackingEventLog`/Klaviyo events via the `value > 10000`-style heuristic sweep, and since these are informational marketing events (not billing records), no financial correction is needed — just fix the code path and treat historical bad values as accepted noise unless a specific flow's aggregate stats need manual adjustment |
+| PAP funded-leg failure coverage gap discovered late | LOW (tracking-only, not a payment-processing bug) | Add the missing call site(s); no historical backfill is realistically possible for tracking events (unlike payment data) — document the gap's start/end date if a marketing stakeholder needs to know why historical PAP-failure segments are incomplete |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| clickid not persisted (gateway callback) | Phase 1 — data model | `partnerClickId` present on User and Payment docs in DB after test purchase via gateway callback |
-| Dual dispatch path double-fire | Phase 1 — architecture | Audit shows only one dispatch path per event; `ConversionWebhookDeliveryLog` shows exactly one entry per userId + event |
-| PAP/free-trial funnel bypass | Phase 1 — event mapping spec | Written spec doc mapping each funnel path to exactly one postback event, reviewed before any code is written |
-| Refund/chargeback no reversal | Phase 2 — reversal postback | Refund a test payment; confirm partner dashboard shows the conversion canceled |
-| Multi-currency JPY as USD | Phase 1 — payload schema | `currency` is required; JP test purchase shows `currency: "JPY"` in delivery log |
-| No brand isolation guard | Phase 1 — brand guard | Temporarily set wrong `PROJECT_ID` in test env; confirm postback is skipped with log warning |
-| Minimal one-off hardcoding | Phase 1 — configuration schema | URL changeable from admin panel without code deploy; test button fires synthetic postback |
-| No retry on 5xx | Phase 2 — retry worker | Simulate partner 5xx; verify retry cron re-fires within expected window |
-| GET vs POST / URL encoding | Phase 1 — HTTP client | Send test postback with clickid containing `+`, `/`, `=`; confirm partner receives correct value |
-| Cross-device clickid loss | Phase 1 — frontend capture | Test signup from different browser after landing page visit; confirm clickid present in delivery log |
-
----
+| Non-idempotent eventId (Pitfall 1) | Same phase as the first failed/expired event-fire implementation | Unit test: firing detection logic twice on the same Payment doc produces the identical `eventId` both times; grep diff for missing `eventId` on any new call |
+| Generic expired-status hook misfiring on non-failure paths (Pitfall 2) | Same phase that decides the trigger location (cron vs. inline hook) | Cross-reference query: no `purchase_failed`/`pap_payment_failed` log rows where a sibling `status: "completed"` doc exists for the same user+program |
+| JPY/currency-unit leak via unconverted `usdAmount` fallback (Pitfall 3) | Same phase as payload-field design, before first call site ships | Unit test with JPY Pending→Expired doc lacking pre-set `usdAmount`; production sweep heuristic (`value > 10000` while `currency === "USD"`) |
+| PAP funded-leg failure paths uncovered (Pitfall 4) | Dedicated audit sub-phase, explicitly separate from "wire the main flow" | Query: `Payment` docs with `payAfterPass: true` and `status` in `[failed, expired]` vs. corresponding `TrackingEventLog` rows — gap size should trend to zero |
+| Multi-file event-name registration drift (Pitfall 5) | Scope-decision phase (reuse `purchase_failed` vs. new event name), before implementation phase | TypeScript compile (`Record<EventName,...>` exhaustiveness) + manual diff review confirming no copy-paste of `purchase_completed`'s Klaviyo metric name |
+| Missing `reason`/`errorCode` mapping in Klaviyo adapter | Same phase as payload design | Manually verify a test-fired event's Klaviyo payload actually contains a `reason`/`error_code` property, not just confirm the field is set on `ITrackingEventPayload` |
 
 ## Sources
 
-- Codebase (HIGH): `pft-backend/src/app/modules/Tracking/dedup/dedup.service.ts` — dedup semantics; `failed` status intentionally allows re-attempt
-- Codebase (HIGH): `pft-backend/src/app/modules/Tracking/enrichment/click-ids.ts` — clickid enrichment reads `req.cookies` and `req.query` only; no fallback to User/Payment doc
-- Codebase (HIGH): `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.service.ts` line 101 — `buildPayload()` generates `crypto.randomUUID()` per call, bypassing dedup
-- Codebase (HIGH): `pft-backend/src/app/modules/Tracking/tracking.constants.ts` line 59 — `pap_payment_completed` is `conversionWebhook: false`
-- Codebase (HIGH): `pft-backend/src/app/modules/Payment/services/paypal-webhook.service.ts` — refund handler has no tracking dispatch
-- Codebase (HIGH): `pft-backend/src/app/modules/Admin/ConversionWebhook/conversion-webhook.service.ts` line 152 — `AbortSignal.timeout(15000)`, one attempt only, no retry
-- Project history (HIGH): `project_pap_jpy_charged_as_usd.md` — JPY billed as USD precedent
-- Project history (HIGH): `project_pap_funded_kyc_bypass.md` — PAP funded-leg skips KYC gate
-- Project history (HIGH): `reference_per_brand_databases.md` — per-DB brand separation; brand guard is documentation-level only, not code-level
+- Direct code reads (this session, `pft-backend` on branch `main-2026`): `src/app/modules/Tracking/tracking.events.service.ts`, `src/app/modules/Tracking/tracking.service.ts`, `src/app/modules/Tracking/tracking.constants.ts`, `src/app/modules/Tracking/tracking.interface.ts`, `src/app/modules/Tracking/dedup/dedup.service.ts`, `src/app/modules/Tracking/enrichment/hash.ts`, `src/app/modules/Tracking/destinations/klaviyo.ts`, `src/app/modules/Payment/utils/trackingPurchaseEmit.ts`, `src/app/modules/Payment/payment.model.ts`, `src/app/modules/Payment/payment.interface.ts`, `src/app/modules/Payment/services/cron.service.ts`, `src/app/modules/Payment/services/fanbasis-webhook.service.ts`, `src/app/modules/Payment/services/stripe-webhook.service.ts`, `src/app/modules/Payment/services/callback.service.ts`, `src/app/modules/Payment/payment.service.modular.ts`. All findings above are traceable to specific line ranges cited inline.
+- Milestone context supplied by the orchestrating task (v1.3 build history: `isFirstPurchase` FTD non-suppression decision, JPY-as-USD payout bug, PAP funded-leg call sites) — corroborated and made more precise by the direct code reads (actual completed-purchase call-site count is 5 across fanbasis x2/stripe/callback/free-path, sharing one `emitTrackingPurchaseCompleted` util, plus separate inline `papPaymentCompleted` calls at the PAP-specific branch in each of those same files).
+- Project memory (`MEMORY.md`): PAP double XP bug, PAP funded KYC bypass, PAP JPY charged as USD, PAP funded queue gate gotcha — used to establish PAP funded-leg code paths' demonstrated history of edge-case bugs in this codebase, and specifically to flag the KYC/contract-gate-hold-vs-failed-payment confusion risk in Pitfall 4.
 
 ---
-
-*Pitfalls research for: partner S2S postback / clickid passthrough — Trading Cult CRM Partner Tracking (v1.3)*
-*Researched: 2026-07-01*
+*Pitfalls research for: pft-backend Klaviyo/tracking dispatch framework — failed/expired purchase event addition (v1.4)*
+*Researched: 2026-07-03*
