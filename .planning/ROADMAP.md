@@ -6,6 +6,7 @@
 - ✅ **v1.1 Affiliate Reporting** — Phase 4, 4 plans (shipped 2026-06-30, ad-hoc) → [archive](milestones/v1.1-ROADMAP.md)
 - ✅ **v1.2 Ticket Fixes + PAP Queue Label** — Phases 4.1–9, 7 plans (shipped 2026-07-01, human-verify pending deploy) → [archive](milestones/v1.2-ROADMAP.md)
 - ✅ **v1.3 CRM Partner Tracking (S2S Postbacks)** — Phases 10-12, 9 plans (shipped 2026-07-01, live-verify pending deploy + partner config) → [archive](milestones/v1.3-ROADMAP.md)
+- 🚧 **v1.4 Klaviyo Purchase-Coverage Fix** — Phase 13 (in progress)
 
 ## Phases
 
@@ -58,7 +59,31 @@ Full detail: [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md)
 
 </details>
 
+### 🚧 v1.4 Klaviyo Purchase-Coverage Fix (In Progress)
+
+**Milestone Goal:** Every purchase-flow outcome (not just completed) reaches Klaviyo, so Trading Cult can see failed/expired attempts alongside completions. Source ticket: cmqtl47g4004zny0kz54mmz0z (Trading Cult).
+
+Coverage-gap bugfix on the existing Tracking/destinations dispatch framework (already shipped in v1.3) — `purchase_failed` is a complete, registered event with zero real callers. This milestone wires it at every genuine customer-facing failure/expiry call site, fixes the Klaviyo adapter's dropped `errorCode`/`reason` property, and excludes internal dedup/race-guard status flips from false-firing it.
+
+#### Phase 13: Purchase-Failure Tracking Wiring
+**Goal**: Every genuine customer-facing failed/expired/cancelled payment reaches Klaviyo with a usable failure reason, exactly once, while internal bookkeeping status flips stay silent.
+**Depends on**: Phase 12 (reuses the `emitTrackingPurchaseCompleted` pattern + stable-eventId convention + dispatcher/adapter framework shipped in v1.3; no new architecture)
+**Requirements**: KLAV-01, KLAV-02, KLAV-03, KLAV-04
+**Success Criteria** (what must be TRUE):
+  1. A payment that expires via the hourly expiry cron fires `purchase_failed` and it is visible in Klaviyo as a "Purchase Failed" event
+  2. A payment that fails/expires/is cancelled via any real gateway webhook (Stripe, FanBasis, PayPal, NOWPayments/crypto) fires `purchase_failed` the same way the cron path does
+  3. The Klaviyo "Purchase Failed" event carries a populated `errorCode`/`reason` property (not silently dropped by the adapter)
+  4. Resending the same gateway webhook (retry/redelivery) does not produce a duplicate "Purchase Failed" event in Klaviyo for the same payment
+  5. The two internal dedup/race-guard `status: "expired"` writes in `payment.service.modular.ts` (PAP sibling-supersede, free-$0-PAP stale-attempt supersede) never fire `purchase_failed` — no false failure events for purchases that actually succeeded
+**Plans**: TBD
+
+Plans:
+- [ ] 13-01: TBD (planned during `/gsd:plan-phase 13`)
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -75,3 +100,4 @@ Full detail: [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md)
 | 10. Capture & Persist | v1.3 | 3/4 | ✓ Complete (code; 10-04 human-verify pending deploy) | 2026-07-01 |
 | 11. Wire Emits + Dedup | v1.3 | 3/3 | ✓ Complete (code; live event-firing verify post-deploy) | 2026-07-01 |
 | 12. partnerPostback Adapter + Config + Verify | v1.3 | 3/3 | ✓ Complete (code-verified; SC5 live-partner test post-deploy) | 2026-07-01 |
+| 13. Purchase-Failure Tracking Wiring | v1.4 | 0/TBD | Not started | - |
