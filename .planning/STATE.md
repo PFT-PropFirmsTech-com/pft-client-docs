@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-07-03)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state. External affiliate partners attribute registrations and conversions via S2S postbacks. Every purchase-flow outcome (not just completed) reaches Klaviyo.
-**Current focus:** v1.4 Klaviyo purchase-coverage fix — Phase 13 (Purchase-Failure Tracking Wiring), all 3 plans complete (foundation util + cron/generic-callback wiring + explicit Stripe/FanBasis/PayPal gateway wiring). Phase 13 code-complete; v1.4 milestone ready to close.
+**Current focus:** Planning next milestone (v1.4 complete). v1.5 leading candidates: Klaviyo follow-ups (KLAV-05 language property + KLAV-06 purchase enrichment, client actively waiting on same ticket cmqtl47g4004zny0kz54mmz0z) or margin-history enhancement.
 
 ## Current Position
 
-Phase: 13 of 13 (Purchase-Failure Tracking Wiring)
-Plan: 03 of 3
-Status: Phase complete
-Last activity: 2026-07-03 — Completed 13-03-PLAN.md (purchase_failed wired into Stripe/FanBasis/PayPal explicit gateway decline/expiry/cancel handlers)
+Phase: — (v1.4 milestone complete; no active phase)
+Plan: Not started
+Status: v1.4 milestone complete — archived, tagged. Ready to plan next milestone via `/gsd:new-milestone`.
+Last activity: 2026-07-03 — v1.4 "Klaviyo Purchase-Coverage Fix" (Phase 13) complete
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████████] 100% (9/9 plans, code-complete + code-level verified) · v1.4 [██████████] 100% (3/3, code-complete)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████████] 100% (9/9 plans, code-complete + code-level verified) · v1.4 [██████████] 100% (3/3, code-complete + goal-verified 5/5)
 
-**Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT) + v1.3: Phase 10 (10-04, full capture→persist path) + Phase 12 (SC5, live Trading Cult postback — ALSO needs Trading Cult's real registrationUrl/conversionUrl configured via `PUT /api/tracking/settings`, not just a deploy).
+**Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT) + v1.3: Phase 10 (10-04, full capture→persist path) + Phase 12 (SC5, live Trading Cult postback — ALSO needs Trading Cult's real registrationUrl/conversionUrl configured via `PUT /api/tracking/settings`, not just a deploy) + v1.4: Phase 13 (4 checks — cron-expired event in Klaviyo, Stripe failure w/ reason, redelivery no-dup, PAP supersede zero-noise).
 
 ## Performance Metrics
 
@@ -38,13 +38,13 @@ Progress: v1.0 [██████████] 100% (10/10) · v1.1 [███�
 
 ### Decisions
 
-Full decision log in PROJECT.md Key Decisions table. Locked conventions carried forward into v1.4:
+Full decision log in PROJECT.md Key Decisions table. Locked conventions carried forward into the next milestone:
 
 - Defer-to-remote (`feedback_rebase_when_remote_already_fixed.md`): fetch origin/main-2026 before editing; if a bug/feature is already closed by a different shape, fast-forward and don't overwrite. Applied 4× across v1.2+v1.3.
 - Post-deploy human-verify is DEFERRED for every phase until main-2026 deploys (project-wide convention since Phase 04-04).
 - All repos (pft-backend, pft-dashboard, pft-rule-checker) commit to `main-2026`; `main` is deprecated. `git branch --show-current` before every commit.
-- Reuse the existing `purchase_failed` event (do not invent `purchase_expired`); differentiate via `errorCode`/`reason` property — locked by v1.4 research, avoids event-taxonomy bloat.
-- v1.4 must NOT fire `purchase_failed` from the two internal PAP dedup/supersede `status: "expired"` bookkeeping writes in `payment.service.modular.ts` — those are concurrency guards, not real customer failures.
+- Payment-status tracking emits ONLY at explicit gateway/cron call sites, never via model hook or status-keyed query (locked v1.4 — internal PAP supersede bulk-writes must stay silent).
+- Normalized errorCode vocabulary for third-party tracking (checkout_expired/card_declined/gateway_failed/cancelled), never raw gateway strings (locked v1.4).
 - Full backend `tsc` OOMs on this machine at both default heap and 8GB (`reference_backend_tsc_oom.md`) — use scoped `--skipLibCheck` on specific files, or a `files`-scoped tsconfig override with `incremental:false` for verification harnesses.
 
 ### Pending Todos
@@ -61,5 +61,5 @@ Full decision log in PROJECT.md Key Decisions table. Locked conventions carried 
 ## Session Continuity
 
 Last session: 2026-07-03
-Stopped at: Completed 13-03-PLAN.md (purchase_failed wired into Stripe/FanBasis/PayPal explicit gateway handlers). Phase 13 is now fully code-complete (13-01, 13-02, 13-03 all done) — v1.4 milestone ready to close.
-Resume file: None. Next action: `/gsd:complete-milestone` for v1.4, or `/gsd:verify-work` for Phase 13.
+Stopped at: v1.4 milestone complete — archived (milestones/v1.4-ROADMAP.md + v1.4-REQUIREMENTS.md), REQUIREMENTS.md deleted, PROJECT.md evolved, ROADMAP.md collapsed, tagged v1.4.
+Resume file: None. Next action: push pft-backend main-2026 (6 unpushed v1.4 commits) + reply to ticket cmqtl47g4004zny0kz54mmz0z; then `/gsd:new-milestone` for v1.5 (Klaviyo follow-ups KLAV-05/06 — client waiting — or margin-history).

@@ -8,15 +8,11 @@ A white-label prop trading platform (pft-dashboard + pft-backend) that lets bran
 
 Funded traders see where they rank and compete in monthly prize-pool competitions (engagement + brand marketing). Affiliates see exactly which purchases earned them which commissions and can reconcile their earnings per tier; admins can reconcile customer purchases against affiliate payouts directly from the Payment History export. Support and back-office staff see the real reason a PAP funded account has not released (compliance gate, not a system failure) instead of a generic "Not Assigned" warning that invites a useless Retry loop. External affiliate partners can prove their traffic converts — a `clickid` survives our funnel unchanged and the partner gets an S2S signal the moment it does.
 
-## Current Milestone: v1.4 Klaviyo Purchase-Coverage Fix
+## Current Milestone: None — v1.4 shipped 2026-07-03, awaiting next
 
-**Goal:** Every purchase-flow outcome (not just completed) reaches Klaviyo, so Trading Cult can see failed/expired attempts alongside completions.
+v1.4 "Klaviyo Purchase-Coverage Fix" (Phase 13, 3 plans) is code-complete + goal-verified 5/5; live human-verify deferred pending the next main-2026 deploy. Full detail: [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md).
 
-**Target features:**
-- Audit checkout/payment flow for all purchase-outcome events (completed, failed, expired) that should dispatch to Klaviyo
-- Wire any missing purchase-outcome events into the existing Tracking/destinations dispatch framework so Klaviyo receives them
-
-v1.3 "CRM Partner Tracking (S2S Postbacks)" (Phases 10-12, 9 plans) shipped 2026-07-01, code-complete + code-level verified, pushed to main-2026; live human-verify still deferred pending the next deploy AND Trading Cult's real postback URLs (external dependency). Full detail: [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md).
+Run `/gsd:new-milestone` to define the next one — candidates in **Next Milestone Goals** below (v1.5 leading candidates: Klaviyo follow-ups from the same ticket, or margin-history enhancement).
 
 ## Requirements
 
@@ -45,12 +41,13 @@ v1.3 "CRM Partner Tracking (S2S Postbacks)" (Phases 10-12, 9 plans) shipped 2026
 - ✓ `signupCompleted`/`purchaseCompleted` tracking events wired at every real completion path incl. PAP + fanbasis, with retry-safe stable eventIds — v1.3 Phase 11
 - ✓ FTD signal (`isFirstPurchase`) on every purchase event without suppressing shared destinations (Meta/GA4/Klaviyo still get every purchase) — v1.3 Phase 11
 - ✓ New `partnerPostback` GET adapter — macro substitution (`{clickid}`/`{goal}`/`{payout}`), encode-once, FTD-gated conversion send, per-brand config, disabled by default — v1.3 Phase 12
+- ✓ Every genuine failed/expired/cancelled payment fires `purchase_failed` to Klaviyo (cron sweep + 4 gateway webhook families incl. Paysafe-via-callback), with `reason`/`error_code` Klaviyo properties, stable `purchase_failed:<paymentId>` dedup eventId, and internal PAP supersede-writes excluded — v1.4 Phase 13
 
-<sub>Code-complete + pushed to main-2026 for v1.0 through v1.3; live human-verify pending the next deploy unlocks all four (v1.3 additionally needs Trading Cult's real postback URLs configured post-deploy).</sub>
+<sub>Code-complete + pushed/committed to main-2026 for v1.0 through v1.4; live human-verify pending the next deploy unlocks all five (v1.3 additionally needs Trading Cult's real postback URLs configured post-deploy).</sub>
 
 ### Active
 
-- [ ] Audit + fix Klaviyo purchase-outcome coverage (Trading Cult ticket cmqtl47g4004zny0kz54mmz0z) — completed purchase reaches Klaviyo, failed/expired does not
+(None — v1.4 shipped. Define the next milestone via `/gsd:new-milestone`.)
 
 Candidate v1.5 / v2 scope: **v1.5 margin-history enhancement** — per-trade max used margin in trade history + daily Used-Margin High-Water-Mark series, client+admin (ticket cmovizb320007qs0k0fue250p, Trading Cult follow-up on shipped Phase 7, both enhancements in scope — see `.planning/todos/pending/2026-07-01-v1.4-per-trade-margin-and-daily-hwm.md`); **Klaviyo language/locale property** + **Klaviyo purchase-event enrichment** (challenge name/type, account size, platform, phase, add-ons, order ID, currency, discount code) — same source ticket cmqtl47g4004zny0kz54mmz0z, deferred out of v1.4 to keep scope to the purchase-coverage bug; **CRM-10/11/12** refund-reversal postback + pull API + generic multi-partner config (v1.3 follow-ups, deferred until a 2nd partner needs them); **PAP-02** Retry button suppress/relabel + **PAP-03** queue reason staleness (deferred items 2 + 3 from DEV cmqbzq6vc007ds50k008tr3du, unblocked since Phase 9); winner email notifications + competition history hall of fame + automated prize disbursement (carried from v1.0); broader admin-panel anchor refactor for new-tab/copy-link (DEV ticket cmqztddis); ticket-portal sprint + archive roadmap (Phases 2 & 3 from .planning/feedback notes); JA email localization completion for Trading Cult; **Funding Optimal free-trial program setup** (ops, no code — pending todo, ticket cmnx4jvry0001mr0kezmxcnnv, blocked on client's Google Ads campaign ending).
 
@@ -108,21 +105,24 @@ Candidate v1.5 / v2 scope: **v1.5 margin-history enhancement** — per-trade max
 | New `partnerPostback` adapter instead of reusing `conversionWebhook` | Wrong wire protocol (POST/JSON/HMAC vs required GET/macro) + wrong event map | ✓ Good (v1.3 Phase 12) |
 | Stable eventIds (`signup:<userId>`, `purchase:<paymentId>`, `pap:<paymentId>`) passed explicitly to every emit | Default `deterministicEventId` is minute-bucketed — insufficient for gateway-webhook retries arriving minutes later | ✓ Good (v1.3 Phase 11) |
 | Minimal one-off config for Trading Cult (`TrackingSettings.destinations.partnerPostback`), not a generic multi-partner UI | Only one partner today; build reusable only when a 2nd partner appears | ✓ Good — locked (v1.3), applies to any future single-partner integration |
+| One `purchase_failed` event for expired/cancelled/failed, differentiated via `reason`/`error_code` property (no `purchase_expired` event) | Matches gateway-status normalization; avoids Klaviyo event-taxonomy bloat; property-filter segmentation | ✓ Good (v1.4) |
+| Wire tracking emits ONLY at explicit gateway/cron call sites, never via model hook or status-keyed query | The two internal PAP supersede `expired` bulk-writes must stay silent; hook-based firing would false-fire "purchase failed" for successful purchases | ✓ Good — locked (v1.4), applies to any future payment-status tracking |
+| Normalized errorCode vocabulary (`checkout_expired`/`card_declined`/`gateway_failed`/`cancelled`), never raw gateway decline strings | Raw strings are PII-adjacent and unbounded — bad for a third-party marketing tool and for segment stability | ✓ Good (v1.4) |
 
 ## Current State
 
-**Shipped:** v1.0 Leaderboard & Competitions (2026-06-29) + v1.1 Affiliate Reporting (2026-06-30) + v1.2 Ticket Fixes + PAP Queue Label (2026-07-01) + v1.3 CRM Partner Tracking (2026-07-01) — all code-complete, pushed to main-2026, live human-verify pending the next deploy (unlocks all four; v1.3 additionally needs Trading Cult's real postback URLs configured post-deploy).
+**Shipped:** v1.0 Leaderboard & Competitions (2026-06-29) + v1.1 Affiliate Reporting (2026-06-30) + v1.2 Ticket Fixes + PAP Queue Label (2026-07-01) + v1.3 CRM Partner Tracking (2026-07-01) + v1.4 Klaviyo Purchase-Coverage Fix (2026-07-03) — all code-complete on main-2026, live human-verify pending the next deploy (unlocks all five; v1.3 additionally needs Trading Cult's real postback URLs configured post-deploy).
 
-**Codebase:** ~4,950 LOC (v1.0/v1.1) plus v1.2's cross-repo ticket fixes (7 plans) plus v1.3's partner-tracking extension (~535 LOC, 9 plans across pft-backend + pft-dashboard). Stack unchanged: Next.js + Node/TS + MongoDB; no new deps across any milestone. Reusable patterns established: bulk-by-orders POST `$in` (v1.1); `paymentId`-keyed queue batch join mirrored into admin (v1.2); new destination-adapter pattern for external partner integrations, dedup/delivery-log inherited free from the dispatcher (v1.3).
+**Codebase:** ~4,950 LOC (v1.0/v1.1) plus v1.2's cross-repo ticket fixes (7 plans) plus v1.3's partner-tracking extension (~535 LOC, 9 plans) plus v1.4's purchase-failure wiring (+108 LOC, 3 plans, pft-backend only). Stack unchanged: Next.js + Node/TS + MongoDB; no new deps across any milestone. Reusable patterns established: bulk-by-orders POST `$in` (v1.1); `paymentId`-keyed queue batch join mirrored into admin (v1.2); destination-adapter pattern for external partner integrations, dedup/delivery-log inherited free from the dispatcher (v1.3); shared fire-and-forget tracking-emit utils with stable per-payment eventIds at explicit call sites only (v1.3 completions, v1.4 failures).
 
-**Source tickets:** v1.0 = cmqybawiz007zny0k1wliphj7 (XPIPS). v1.1 = cmqqchwh500bspi0kxw23o2rl (Trading Cult). v1.2 = DEV cmqbzq6vc007ds50k008tr3du (PAP-01/Phase 9) + Trading Cult/XPIPS/FO ticket fixes (Phases 4.1–8). v1.3 = cmqt52jdb001dny0kknkou9x0 (Trading Cult Pro). All flip WAITING_CLIENT after deploy + verify.
+**Source tickets:** v1.0 = cmqybawiz007zny0k1wliphj7 (XPIPS). v1.1 = cmqqchwh500bspi0kxw23o2rl (Trading Cult). v1.2 = DEV cmqbzq6vc007ds50k008tr3du (PAP-01/Phase 9) + Trading Cult/XPIPS/FO ticket fixes (Phases 4.1–8). v1.3 = cmqt52jdb001dny0kknkou9x0 (Trading Cult Pro). v1.4 = cmqtl47g4004zny0kz54mmz0z (Trading Cult Pro, Klaviyo — 2 further asks from same ticket deferred to v1.5). All flip WAITING_CLIENT after deploy + verify.
 
-**Open (post-deploy human-verify, all gated on the next main-2026 deploy):** v1.0 Phases 2 & 3 (anon masking, opt-out, competition close, cache isolation); v1.1 Phase 4 (Purchase Report card + admin CSV cols + single-POST); v1.2 Phases 4.1–9 (CSV tier-sum; daily P&L TC acct 13535; funded-queue badge; margin card client+admin; breach-email body per brand XPIPS+FO; PAP queue label NSF payment 6a2c08b1ab4caef5631099a2 → "Awaiting KYC"); v1.3 Phase 10 (10-04, full capture→persist path) + Phase 12 (SC5, live Trading Cult postback — ALSO needs Trading Cult's real registrationUrl/conversionUrl set via `PUT /api/tracking/settings`, not just a deploy).
+**Open (post-deploy human-verify, all gated on the next main-2026 deploy):** v1.0 Phases 2 & 3 (anon masking, opt-out, competition close, cache isolation); v1.1 Phase 4 (Purchase Report card + admin CSV cols + single-POST); v1.2 Phases 4.1–9 (CSV tier-sum; daily P&L TC acct 13535; funded-queue badge; margin card client+admin; breach-email body per brand XPIPS+FO; PAP queue label NSF payment 6a2c08b1ab4caef5631099a2 → "Awaiting KYC"); v1.3 Phase 10 (10-04, full capture→persist path) + Phase 12 (SC5, live Trading Cult postback — ALSO needs Trading Cult's real registrationUrl/conversionUrl set via `PUT /api/tracking/settings`, not just a deploy); v1.4 Phase 13 (4 checks: cron-expired event in Klaviyo, live Stripe failure w/ reason, redelivery no-dup, PAP supersede zero-noise).
 
 ## Next Milestone Goals
 
-v1.4 is active (Klaviyo purchase-coverage fix, above). After v1.4 ships, define v1.5 via `/gsd:new-milestone`. Candidates:
-- **Klaviyo follow-ups (deferred from v1.4, same ticket cmqtl47g4004zny0kz54mmz0z):** language/locale as Klaviyo profile/event property (verify existing `Language: ja` custom prop is code-driven, not stale); purchase-event enrichment (challenge name/type, account size, platform, phase, add-ons, order ID, currency, discount code).
+Define v1.5 via `/gsd:new-milestone`. Candidates:
+- **Klaviyo follow-ups (deferred from v1.4, same ticket cmqtl47g4004zny0kz54mmz0z — client actively waiting):** language/locale as Klaviyo profile/event property (verify existing `Language: ja` custom prop is code-driven, not stale); purchase-event enrichment (challenge name/type, account size, platform, phase, add-ons, order ID, currency, discount code); PAP funded-leg failure-tracking audit (KLAV-07, no `pap_payment_failed` equivalent exists).
 - **Margin history enhancement (queued, research-shaped):** per-trade max used margin in the dashboard trade history + a daily Used-Margin High-Water-Mark series, client + admin — Trading Cult follow-up on the shipped Phase 7 MarginUsageCard (ticket cmovizb320007qs0k0fue250p, client confirmed Phase 7 works + requested this 2026-07-01). Both enhancements in scope; research-first (per-trade margin capture in the rule-checker is the open question). See `.planning/todos/pending/2026-07-01-v1.4-per-trade-margin-and-daily-hwm.md`.
 - **v1.3 follow-ups (deferred by design):** CRM-10 refund/chargeback reversal postback, CRM-11 pull API, CRM-12 generic multi-partner config — build when a 2nd partner needs them.
 - **Ops (no code, blocked on client):** Funding Optimal free-trial program setup (ticket cmnx4jvry0001mr0kezmxcnnv — pending todo, waiting on client's Google Ads campaign to end).
@@ -131,4 +131,4 @@ v1.4 is active (Klaviyo purchase-coverage fix, above). After v1.4 ships, define 
 - **v2 substantive:** winner email notifications + competition history + automated prize disbursement (carried from v1.0).
 
 ---
-*Last updated: 2026-07-03 after starting v1.4 Klaviyo purchase-coverage milestone*
+*Last updated: 2026-07-03 after v1.4 Klaviyo Purchase-Coverage Fix milestone completion*

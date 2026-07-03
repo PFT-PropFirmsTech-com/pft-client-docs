@@ -1,5 +1,32 @@
 # Milestones
 
+## v1.4 — Klaviyo Purchase-Coverage Fix (Shipped: 2026-07-03)
+
+**Delivered:** Every genuine customer-facing failed/expired/cancelled payment now fires the `purchase_failed` tracking event to Klaviyo with a usable failure reason and retry-safe dedup — closing the coverage gap where Trading Cult saw completed purchases in Klaviyo but never failed/expired ones (ticket cmqtl47g4004zny0kz54mmz0z).
+
+**Phases completed:** 13 (3 plans, 2 waves; 4 live-Klaviyo human-verify checks deferred post-deploy)
+
+**Key accomplishments:**
+
+- **Dead scaffold wired live** — `purchase_failed` was a fully-built, fully-registered tracking event (catalog, per-brand toggles, Klaviyo "Purchase Failed" mapping, typed helper) with ZERO callers; the milestone wired it at every genuine failure site instead of building anything new. Exact mirror of v1.3's `signupCompleted`/`purchaseCompleted` zero-caller discovery.
+- **Shared `emitTrackingPurchaseFailed()` util** — mirrors the proven v1.3 `emitTrackingPurchaseCompleted` pattern: USD-normalized value (`usdAmount` only — JPY-as-USD guard), stable `purchase_failed:<paymentId>` eventId (webhook redelivery dedup), fire-and-forget never-throws, normalized errorCode vocabulary (never raw gateway decline strings to a third party).
+- **Klaviyo adapter property fix** — `buildProperties()` silently dropped `errorCode`/`reason`; now promotes both as `reason`/`error_code` (table-driven, no event-name special-casing) so failed events are actually segmentable.
+- **7 genuine failure sites wired, false-positive traps excluded** — hourly expiry cron (provider-agnostic, highest volume), generic callback handler (covers NOWPayments/crypto AND Paysafe via routing), Stripe ×2, FanBasis ×3, PayPal capture-denied ×1. Deliberately silent: 4+2+7 gateway security/validation-guard branches AND the two internal PAP dedup/supersede `expired` bulk-writes in `payment.service.modular.ts` — the trap that would have fired false "purchase failed" events for customers whose purchase actually succeeded.
+- **Paysafe routing question resolved during planning** — confirmed `handlePaysafeCallback` → `PaymentService.handleCallback` → `handleNonCompletedPayment`, so Paysafe was covered by the generic-callback wiring at zero extra cost (research had flagged it unverified).
+
+**Stats:**
+- 8 files, +108 LOC (pft-backend only, no frontend change)
+- 1 phase, 3 plans, 6 atomic commits
+- Same day (2026-07-03): research (4 parallel agents) → requirements → roadmap → plan+verify → execute (2 waves) → goal-verify 5/5
+
+**Git range:** pft-backend `feat(13-01)` (`c8382daf`) → `feat(13-03)` (`b6042d66`). All on main-2026.
+
+**Caveat:** Code-complete + code-level verified (goal-verifier 5/5 must-haves, scoped tsc clean on all 8 files). Live human-verify DEFERRED pending next main-2026 deploy: (1) cron-expired payment visible in Klaviyo, (2) live Stripe failure webhook → single event w/ reason, (3) webhook redelivery no-duplicate, (4) PAP supersede traffic produces zero Klaviyo noise. No milestone audit run (user decision — single phase, verifier already covered cross-plan integration).
+
+**What's next:** Deploy main-2026 → run deferred verify checklist → reply to ticket cmqtl47g4004zny0kz54mmz0z (client also has 2 deferred asks queued as v1.5 candidates: language/locale Klaviyo property + purchase-event enrichment w/ challenge details). Other v1.5 candidates: margin-history enhancement (ticket cmovizb320007qs0k0fue250p), PAP funded-leg failure-tracking audit (KLAV-07).
+
+---
+
 ## v1.3 — CRM Partner Tracking (S2S Postbacks) (Shipped: 2026-07-01)
 
 **Delivered:** A Trading Cult affiliate partner can attribute registrations and first-sales to their own traffic — a partner `clickid` is captured at a tracking-link entry, persists unchanged through signup and purchase (surviving `req=null` gateway callbacks), and fires S2S GET postbacks (clickid/goal/payout) back to the partner on registration and first-time-deposit conversion.
