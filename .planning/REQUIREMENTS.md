@@ -42,16 +42,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| KLAV-05 | TBD | Pending |
-| KLAV-09 | TBD | Pending |
-| KLAV-06 | TBD | Pending |
-| KLAV-10 | TBD | Pending |
+| KLAV-05 | Phase 14 | Pending |
+| KLAV-09 | Phase 14 | Pending |
+| KLAV-06 | Phase 15 | Pending |
+| KLAV-10 | Phase 15 | Pending |
 
 **Coverage:**
 - v1 requirements: 4 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 4 ⚠️ (roadmap not yet created)
+- Mapped to phases: 4/4 ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-03*
-*Last updated: 2026-07-03 after initial definition*
+*Last updated: 2026-07-03 after roadmap creation (Phases 14-15)*

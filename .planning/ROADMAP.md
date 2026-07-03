@@ -7,6 +7,7 @@
 - ✅ **v1.2 Ticket Fixes + PAP Queue Label** — Phases 4.1–9, 7 plans (shipped 2026-07-01, human-verify pending deploy) → [archive](milestones/v1.2-ROADMAP.md)
 - ✅ **v1.3 CRM Partner Tracking (S2S Postbacks)** — Phases 10-12, 9 plans (shipped 2026-07-01, live-verify pending deploy + partner config) → [archive](milestones/v1.3-ROADMAP.md)
 - ✅ **v1.4 Klaviyo Purchase-Coverage Fix** — Phase 13, 3 plans (shipped 2026-07-03, live Klaviyo verify pending deploy) → [archive](milestones/v1.4-ROADMAP.md)
+- 🚧 **v1.5 Klaviyo Language & Purchase Enrichment** — Phases 14-15 (in progress)
 
 ## Phases
 
@@ -68,10 +69,44 @@ Full detail: [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md)
 
 </details>
 
+### 🚧 v1.5 Klaviyo Language & Purchase Enrichment (In Progress)
+
+**Milestone Goal:** Trading Cult can segment Klaviyo by client language (JP campaigns) and by what was actually purchased (challenge details on purchase events). Source ticket: cmqtl47g4004zny0kz54mmz0z (Trading Cult Pro) — 2 further asks from the same v1.4 ticket.
+
+Extends the existing Tracking module (dispatcher, event catalog, `klaviyo.ts` `buildProperties()`) with new profile/event properties. No new event names — properties added to existing events only. Two independent data paths (user-profile-derived language vs. payment/program-join purchase context) run as parallel phases with no functional dependency between them, only a shared-file touch in `tracking.interface.ts`/`klaviyo.ts`.
+
+#### Phase 14: Klaviyo Language Property
+
+**Goal**: Every Klaviyo-bound event carrying an email also carries the client's language as a profile/event property, derived from real user data via a defined fallback order, and the existing stray `Language: ja` profile property is confirmed superseded (not left as stale one-off data).
+**Depends on**: Nothing (extends existing Tracking framework from v1.3/v1.4; independent of Phase 15)
+**Requirements**: KLAV-05, KLAV-09
+**Success Criteria** (what must be TRUE):
+  1. A user with a stored language/locale preference produces a Klaviyo event/profile property reflecting that value (not hardcoded, not English-only)
+  2. A user with no stored language preference but a phone region or address country still produces a best-effort language/locale property, per a defined source-order (stored locale → phone region → address country)
+  3. A user with none of the above sources present emits with the property omitted (never a placeholder/guessed default that misrepresents real data)
+  4. The derivation source order is applied consistently across every Klaviyo-bound event that carries an email (not just purchase events)
+  5. The pre-existing `Language: ja` value seen on one live Klaviyo profile is confirmed either produced by this implementation going forward, or documented as stale/superseded pre-existing data (not a mystery second code path)
+
+Plans: TBD
+
+#### Phase 15: Klaviyo Purchase Enrichment
+
+**Goal**: `purchase_completed`, `pap_payment_completed`, and `purchase_failed` events carry full program and commerce context as Klaviyo properties, so Trading Cult can segment by what was actually purchased.
+**Depends on**: Nothing (extends the same 3 existing events' call sites from v1.3/v1.4; independent of Phase 14)
+**Requirements**: KLAV-06, KLAV-10
+**Success Criteria** (what must be TRUE):
+  1. A completed standard purchase's Klaviyo event carries challenge name, challenge type, account size, and platform (MT4/MT5/cTrader) as properties
+  2. A completed PAP funded-leg purchase's Klaviyo event carries the same program-context properties as a standard purchase, including phase where applicable
+  3. A failed/expired/cancelled purchase's Klaviyo event (wired in v1.4) also carries the same program-context properties, not just the existing `reason`/`error_code`
+  4. Every one of the 3 purchase events carries commerce context: order ID, currency, and — when present — add-ons and the discount/coupon code actually used (never a raw gateway string, and never left populated as a stale value from an unrelated purchase)
+  5. All new properties are normalized closed-vocabulary or ID/string values only — no raw gateway/PII-adjacent strings, and no new Klaviyo event/metric names introduced
+
+Plans: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -89,5 +124,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6 → 7 �
 | 11. Wire Emits + Dedup | v1.3 | 3/3 | ✓ Complete (code; live event-firing verify post-deploy) | 2026-07-01 |
 | 12. partnerPostback Adapter + Config + Verify | v1.3 | 3/3 | ✓ Complete (code-verified; SC5 live-partner test post-deploy) | 2026-07-01 |
 | 13. Purchase-Failure Tracking Wiring | v1.4 | 3/3 | ✓ Complete (code-verified 5/5; live Klaviyo verify pending deploy) | 2026-07-03 |
+| 14. Klaviyo Language Property | v1.5 | 0/TBD | Not started | - |
+| 15. Klaviyo Purchase Enrichment | v1.5 | 0/TBD | Not started | - |
 
-_Next milestone: define via `/gsd:new-milestone` (v1.5 candidates: Klaviyo follow-ups KLAV-05/06/07 from same ticket; margin-history enhancement)._
+_Next: `/gsd:plan-phase 14` (or 15 — no dependency order between them)._
