@@ -69,6 +69,19 @@ Full detail: [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md)
 
 </details>
 
+### Phase 13.1: Password Length DOS Fix (INSERTED)
+
+**Goal:** Server-side max password length enforced on registration (all brands) before bcrypt hashing, closing external DOS report.
+**Depends on:** Phase 13
+**Requirements:** SEC-01 (ad hoc — external report umer@barhamsec.com, target app.xpips.com /auth/register)
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 13.1 to break down)
+
+**Details:**
+[To be added during planning]
+
 ### 🚧 v1.5 Klaviyo Language & Purchase Enrichment (In Progress)
 
 **Milestone Goal:** Trading Cult can segment Klaviyo by client language (JP campaigns) and by what was actually purchased (challenge details on purchase events). Source ticket: cmqtl47g4004zny0kz54mmz0z (Trading Cult Pro) — 2 further asks from the same v1.4 ticket.
@@ -87,7 +100,9 @@ Extends the existing Tracking module (dispatcher, event catalog, `klaviyo.ts` `b
   4. The derivation source order is applied consistently across every Klaviyo-bound event that carries an email (not just purchase events)
   5. The pre-existing `Language: ja` value seen on one live Klaviyo profile is confirmed either produced by this implementation going forward, or documented as stale/superseded pre-existing data (not a mystery second code path)
 
-Plans: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 14-01-PLAN.md — deriveUserLanguage util (stored locale → phone region → address country, omit-when-unknown) + central enrichUserData wiring + Klaviyo profile/event Language property + KLAV-09 stray-property finding doc
 
 #### Phase 15: Klaviyo Purchase Enrichment
 
@@ -106,7 +121,7 @@ Plans: TBD
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 13.1 → 14 → 15
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -124,6 +139,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6 → 7 �
 | 11. Wire Emits + Dedup | v1.3 | 3/3 | ✓ Complete (code; live event-firing verify post-deploy) | 2026-07-01 |
 | 12. partnerPostback Adapter + Config + Verify | v1.3 | 3/3 | ✓ Complete (code-verified; SC5 live-partner test post-deploy) | 2026-07-01 |
 | 13. Purchase-Failure Tracking Wiring | v1.4 | 3/3 | ✓ Complete (code-verified 5/5; live Klaviyo verify pending deploy) | 2026-07-03 |
+| 13.1. Password Length DOS Fix (INSERTED) | urgent | 0/TBD | Not started | - |
 | 14. Klaviyo Language Property | v1.5 | 0/TBD | Not started | - |
 | 15. Klaviyo Purchase Enrichment | v1.5 | 0/TBD | Not started | - |
 
