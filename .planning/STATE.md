@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-07-03)
 
 **Core value:** Funded traders rank + compete in monthly prize pool competitions. Affiliates see per-purchase commission breakdown. Support sees the actual PAP funded-queue state. External affiliate partners attribute registrations and conversions via S2S postbacks. Every purchase-flow outcome (not just completed) reaches Klaviyo.
-**Current focus:** Planning next milestone (v1.4 complete). v1.5 leading candidates: Klaviyo follow-ups (KLAV-05 language property + KLAV-06 purchase enrichment, client actively waiting on same ticket cmqtl47g4004zny0kz54mmz0z) or margin-history enhancement.
+**Current focus:** v1.5 Klaviyo Language & Purchase Enrichment (ticket cmqtl47g4004zny0kz54mmz0z, KLAV-05 + KLAV-06) — defining requirements.
 
 ## Current Position
 
-Phase: — (v1.4 milestone complete; no active phase)
-Plan: Not started
-Status: v1.4 milestone complete — archived, tagged. Ready to plan next milestone via `/gsd:new-milestone`.
-Last activity: 2026-07-03 — v1.4 "Klaviyo Purchase-Coverage Fix" (Phase 13) complete
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-03 — Milestone v1.5 Klaviyo Language & Purchase Enrichment started (research skipped — v1.4 research still fresh, covers the Tracking module)
 
 Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████████] 100% (9/9 plans, code-complete + code-level verified) · v1.4 [██████████] 100% (3/3, code-complete + goal-verified 5/5)
 

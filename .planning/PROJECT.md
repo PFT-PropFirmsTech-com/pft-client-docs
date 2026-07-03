@@ -8,11 +8,15 @@ A white-label prop trading platform (pft-dashboard + pft-backend) that lets bran
 
 Funded traders see where they rank and compete in monthly prize-pool competitions (engagement + brand marketing). Affiliates see exactly which purchases earned them which commissions and can reconcile their earnings per tier; admins can reconcile customer purchases against affiliate payouts directly from the Payment History export. Support and back-office staff see the real reason a PAP funded account has not released (compliance gate, not a system failure) instead of a generic "Not Assigned" warning that invites a useless Retry loop. External affiliate partners can prove their traffic converts — a `clickid` survives our funnel unchanged and the partner gets an S2S signal the moment it does.
 
-## Current Milestone: None — v1.4 shipped 2026-07-03, awaiting next
+## Current Milestone: v1.5 Klaviyo Language & Purchase Enrichment
 
-v1.4 "Klaviyo Purchase-Coverage Fix" (Phase 13, 3 plans) is code-complete + goal-verified 5/5; live human-verify deferred pending the next main-2026 deploy. Full detail: [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md).
+**Goal:** Trading Cult can segment Klaviyo by client language (JP campaigns) and by what was actually purchased (challenge details on purchase events).
 
-Run `/gsd:new-milestone` to define the next one — candidates in **Next Milestone Goals** below (v1.5 leading candidates: Klaviyo follow-ups from the same ticket, or margin-history enhancement).
+**Target features:**
+- Client language (or reliable location proxy) as a Klaviyo profile/event property — first verify whether the `Language: ja` custom prop already seen on one profile is code-driven or stale
+- Purchase events enriched with challenge name, challenge type, account size, platform (MT4/MT5/cTrader), phase, add-ons, order ID, currency, discount code
+
+v1.4 "Klaviyo Purchase-Coverage Fix" (Phase 13, 3 plans) shipped 2026-07-03, pushed to main-2026; live human-verify deferred pending next deploy. Full detail: [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md).
 
 ## Requirements
 
@@ -47,9 +51,10 @@ Run `/gsd:new-milestone` to define the next one — candidates in **Next Milesto
 
 ### Active
 
-(None — v1.4 shipped. Define the next milestone via `/gsd:new-milestone`.)
+- [ ] Client language (or location proxy) reaches Klaviyo as a profile/event property for JP segmentation (ticket cmqtl47g4004zny0kz54mmz0z)
+- [ ] Purchase events carry challenge details (name/type, account size, platform, phase, add-ons, order ID, currency, discount code) for Klaviyo segments (same ticket)
 
-Candidate v1.5 / v2 scope: **v1.5 margin-history enhancement** — per-trade max used margin in trade history + daily Used-Margin High-Water-Mark series, client+admin (ticket cmovizb320007qs0k0fue250p, Trading Cult follow-up on shipped Phase 7, both enhancements in scope — see `.planning/todos/pending/2026-07-01-v1.4-per-trade-margin-and-daily-hwm.md`); **Klaviyo language/locale property** + **Klaviyo purchase-event enrichment** (challenge name/type, account size, platform, phase, add-ons, order ID, currency, discount code) — same source ticket cmqtl47g4004zny0kz54mmz0z, deferred out of v1.4 to keep scope to the purchase-coverage bug; **CRM-10/11/12** refund-reversal postback + pull API + generic multi-partner config (v1.3 follow-ups, deferred until a 2nd partner needs them); **PAP-02** Retry button suppress/relabel + **PAP-03** queue reason staleness (deferred items 2 + 3 from DEV cmqbzq6vc007ds50k008tr3du, unblocked since Phase 9); winner email notifications + competition history hall of fame + automated prize disbursement (carried from v1.0); broader admin-panel anchor refactor for new-tab/copy-link (DEV ticket cmqztddis); ticket-portal sprint + archive roadmap (Phases 2 & 3 from .planning/feedback notes); JA email localization completion for Trading Cult; **Funding Optimal free-trial program setup** (ops, no code — pending todo, ticket cmnx4jvry0001mr0kezmxcnnv, blocked on client's Google Ads campaign ending).
+Candidate v1.6 / v2 scope: **margin-history enhancement** — per-trade max used margin in trade history + daily Used-Margin High-Water-Mark series, client+admin (ticket cmovizb320007qs0k0fue250p, Trading Cult follow-up on shipped Phase 7, both enhancements in scope — see `.planning/todos/pending/2026-07-01-v1.4-per-trade-margin-and-daily-hwm.md`); **KLAV-07** PAP funded-leg failure-tracking audit (internal gap, no `pap_payment_failed` equivalent); **CRM-10/11/12** refund-reversal postback + pull API + generic multi-partner config (v1.3 follow-ups, deferred until a 2nd partner needs them); **PAP-02** Retry button suppress/relabel + **PAP-03** queue reason staleness (deferred items 2 + 3 from DEV cmqbzq6vc007ds50k008tr3du, unblocked since Phase 9); winner email notifications + competition history hall of fame + automated prize disbursement (carried from v1.0); broader admin-panel anchor refactor for new-tab/copy-link (DEV ticket cmqztddis); ticket-portal sprint + archive roadmap (Phases 2 & 3 from .planning/feedback notes); JA email localization completion for Trading Cult; **Funding Optimal free-trial program setup** (ops, no code — pending todo, ticket cmnx4jvry0001mr0kezmxcnnv, blocked on client's Google Ads campaign ending).
 
 ### Out of Scope
 
@@ -121,8 +126,8 @@ Candidate v1.5 / v2 scope: **v1.5 margin-history enhancement** — per-trade max
 
 ## Next Milestone Goals
 
-Define v1.5 via `/gsd:new-milestone`. Candidates:
-- **Klaviyo follow-ups (deferred from v1.4, same ticket cmqtl47g4004zny0kz54mmz0z — client actively waiting):** language/locale as Klaviyo profile/event property (verify existing `Language: ja` custom prop is code-driven, not stale); purchase-event enrichment (challenge name/type, account size, platform, phase, add-ons, order ID, currency, discount code); PAP funded-leg failure-tracking audit (KLAV-07, no `pap_payment_failed` equivalent exists).
+v1.5 is active (Klaviyo language + purchase enrichment, above). After v1.5 ships, candidates:
+- **KLAV-07 PAP funded-leg failure-tracking audit** (internal gap found in v1.4 research, no `pap_payment_failed` equivalent exists).
 - **Margin history enhancement (queued, research-shaped):** per-trade max used margin in the dashboard trade history + a daily Used-Margin High-Water-Mark series, client + admin — Trading Cult follow-up on the shipped Phase 7 MarginUsageCard (ticket cmovizb320007qs0k0fue250p, client confirmed Phase 7 works + requested this 2026-07-01). Both enhancements in scope; research-first (per-trade margin capture in the rule-checker is the open question). See `.planning/todos/pending/2026-07-01-v1.4-per-trade-margin-and-daily-hwm.md`.
 - **v1.3 follow-ups (deferred by design):** CRM-10 refund/chargeback reversal postback, CRM-11 pull API, CRM-12 generic multi-partner config — build when a 2nd partner needs them.
 - **Ops (no code, blocked on client):** Funding Optimal free-trial program setup (ticket cmnx4jvry0001mr0kezmxcnnv — pending todo, waiting on client's Google Ads campaign to end).
@@ -131,4 +136,4 @@ Define v1.5 via `/gsd:new-milestone`. Candidates:
 - **v2 substantive:** winner email notifications + competition history + automated prize disbursement (carried from v1.0).
 
 ---
-*Last updated: 2026-07-03 after v1.4 Klaviyo Purchase-Coverage Fix milestone completion*
+*Last updated: 2026-07-03 after starting v1.5 Klaviyo Language & Purchase Enrichment milestone*
