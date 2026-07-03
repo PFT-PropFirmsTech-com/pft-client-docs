@@ -102,7 +102,7 @@ Extends the existing Tracking module (dispatcher, event catalog, `klaviyo.ts` `b
 
 **Plans:** 1 plan
 Plans:
-- [ ] 14-01-PLAN.md — deriveUserLanguage util (stored locale → phone region → address country, omit-when-unknown) + central enrichUserData wiring + Klaviyo profile/event Language property + KLAV-09 stray-property finding doc
+- [x] 14-01-PLAN.md — deriveUserLanguage util (stored locale → phone region → address country, omit-when-unknown) + central enrichUserData wiring + Klaviyo profile/event Language property + KLAV-09 stray-property finding doc
 
 #### Phase 15: Klaviyo Purchase Enrichment
 
@@ -140,7 +140,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6 → 7 �
 | 12. partnerPostback Adapter + Config + Verify | v1.3 | 3/3 | ✓ Complete (code-verified; SC5 live-partner test post-deploy) | 2026-07-01 |
 | 13. Purchase-Failure Tracking Wiring | v1.4 | 3/3 | ✓ Complete (code-verified 5/5; live Klaviyo verify pending deploy) | 2026-07-03 |
 | 13.1. Password Length DOS Fix (INSERTED) | urgent | 0/TBD | Not started | - |
-| 14. Klaviyo Language Property | v1.5 | 0/TBD | Not started | - |
+| 14. Klaviyo Language Property | v1.5 | 1/1 | ✓ Complete (code; live Klaviyo verify pending deploy) | 2026-07-03 |
 | 15. Klaviyo Purchase Enrichment | v1.5 | 0/TBD | Not started | - |
 
 _Next: `/gsd:plan-phase 14` (or 15 — no dependency order between them)._
