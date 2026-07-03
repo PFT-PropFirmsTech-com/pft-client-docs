@@ -75,10 +75,12 @@ Coverage-gap bugfix on the existing Tracking/destinations dispatch framework (al
   3. The Klaviyo "Purchase Failed" event carries a populated `errorCode`/`reason` property (not silently dropped by the adapter)
   4. Resending the same gateway webhook (retry/redelivery) does not produce a duplicate "Purchase Failed" event in Klaviyo for the same payment
   5. The two internal dedup/race-guard `status: "expired"` writes in `payment.service.modular.ts` (PAP sibling-supersede, free-$0-PAP stale-attempt supersede) never fire `purchase_failed` — no false failure events for purchases that actually succeeded
-**Plans**: TBD
+**Plans**: 3 plans (2 waves)
 
 Plans:
-- [ ] 13-01: TBD (planned during `/gsd:plan-phase 13`)
+- [ ] 13-01-PLAN.md — Foundation: extend `purchaseFailed` helper (reason+eventId), fix Klaviyo `buildProperties()` to promote reason/error_code, new shared `emitTrackingPurchaseFailed()` util (wave 1)
+- [ ] 13-02-PLAN.md — Wire highest-volume provider-agnostic paths: hourly expiry cron + generic callback handler (covers crypto AND Paysafe via `handleCallback` routing) (wave 2)
+- [ ] 13-03-PLAN.md — Wire explicit gateway webhooks: Stripe (2), FanBasis (3), PayPal capture-denied (1); security/validation guards deliberately left silent (wave 2)
 
 ## Progress
 
