@@ -74,13 +74,13 @@ Full detail: [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md)
 **Goal:** Server-side max password length enforced on registration (all brands) before bcrypt hashing, closing external DOS report.
 **Depends on:** Phase 13
 **Requirements:** SEC-01 (ad hoc — external report umer@barhamsec.com, target app.xpips.com /auth/register)
-**Plans:** 0 plans
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 13.1 to break down)
+- [ ] 13.1-01-PLAN.md — add `.max(72)` to all 4 user-supplied password fields in auth.validation.ts (register/login/change-password/forgot-password), rejecting oversized input at validateRequest before bcrypt; behavioral safeParse verify
 
 **Details:**
-[To be added during planning]
+Single-file, single-repo fix (pft-backend `src/app/modules/Auth/auth.validation.ts`, ships from `main-2026`, global across all brands). Adds the OWASP bcrypt-safe 72-char ceiling to the 4 fields that reach `bcrypt.hash`/`bcrypt.compare` (register.password, login.password, changePassword.currentPassword+newPassword, forgotPassword.newPassword). `validateRequest` runs Zod before the controller, so oversized input is rejected 422 pre-bcrypt. Out of scope: frontend maxlength, per-brand config, rate-limiter changes, adding a `.min()` to the pre-existing-optional changePassword.newPassword.
 
 ### 🚧 v1.5 Klaviyo Language & Purchase Enrichment (In Progress)
 
