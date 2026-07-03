@@ -69,18 +69,18 @@ Full detail: [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md)
 
 </details>
 
-### Phase 13.1: Password Length DOS Fix (INSERTED)
+### ✅ Phase 13.1: Password Length DOS Fix (INSERTED) — COMPLETE 2026-07-03
 
 **Goal:** Server-side max password length enforced on registration (all brands) before bcrypt hashing, closing external DOS report.
 **Depends on:** Phase 13
 **Requirements:** SEC-01 (ad hoc — external report umer@barhamsec.com, target app.xpips.com /auth/register)
-**Plans:** 1 plan
+**Plans:** 1/1 plan
 
 Plans:
-- [ ] 13.1-01-PLAN.md — add `.max(72)` to all 4 user-supplied password fields in auth.validation.ts (register/login/change-password/forgot-password), rejecting oversized input at validateRequest before bcrypt; behavioral safeParse verify
+- [x] 13.1-01-PLAN.md — added `.max(72)` to all 4 user-supplied password fields in auth.validation.ts (register/login/change-password/forgot-password), rejecting oversized input at validateRequest before bcrypt; behavioral safeParse verify. Commit `49799c65` (pft-backend, main-2026). Verifier 5/5.
 
 **Details:**
-Single-file, single-repo fix (pft-backend `src/app/modules/Auth/auth.validation.ts`, ships from `main-2026`, global across all brands). Adds the OWASP bcrypt-safe 72-char ceiling to the 4 fields that reach `bcrypt.hash`/`bcrypt.compare` (register.password, login.password, changePassword.currentPassword+newPassword, forgotPassword.newPassword). `validateRequest` runs Zod before the controller, so oversized input is rejected 422 pre-bcrypt. Out of scope: frontend maxlength, per-brand config, rate-limiter changes, adding a `.min()` to the pre-existing-optional changePassword.newPassword.
+Single-file, single-repo fix (pft-backend `src/app/modules/Auth/auth.validation.ts`, ships from `main-2026`, global across all brands). Adds the OWASP bcrypt-safe 72-char ceiling to the 4 fields that reach `bcrypt.hash`/`bcrypt.compare` (register.password, login.password, changePassword.currentPassword+newPassword, forgotPassword.newPassword). `validateRequest` runs Zod before the controller, so oversized input is rejected pre-bcrypt (actual response code is 400 via `handleZodError`, not 422 as originally worded in must_haves — behavior confirmed correct, wording-only note). Out of scope: frontend maxlength, per-brand config, rate-limiter changes, adding a `.min()` to the pre-existing-optional changePassword.newPassword. Human-verify pending: live 400 response on app.xpips.com/auth/register post-deploy.
 
 ### 🚧 v1.5 Klaviyo Language & Purchase Enrichment (In Progress)
 
@@ -139,7 +139,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6 → 7 �
 | 11. Wire Emits + Dedup | v1.3 | 3/3 | ✓ Complete (code; live event-firing verify post-deploy) | 2026-07-01 |
 | 12. partnerPostback Adapter + Config + Verify | v1.3 | 3/3 | ✓ Complete (code-verified; SC5 live-partner test post-deploy) | 2026-07-01 |
 | 13. Purchase-Failure Tracking Wiring | v1.4 | 3/3 | ✓ Complete (code-verified 5/5; live Klaviyo verify pending deploy) | 2026-07-03 |
-| 13.1. Password Length DOS Fix (INSERTED) | urgent | 0/TBD | Not started | - |
+| 13.1. Password Length DOS Fix (INSERTED) | urgent | 1/1 | ✓ Complete (code-verified 5/5; live 400-response verify pending deploy) | 2026-07-03 |
 | 14. Klaviyo Language Property | v1.5 | 1/1 | ✓ Complete (code; live Klaviyo verify pending deploy) | 2026-07-03 |
 | 15. Klaviyo Purchase Enrichment | v1.5 | 0/TBD | Not started | - |
 
