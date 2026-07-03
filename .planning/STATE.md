@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-07-03)
 
 ## Current Position
 
-Phase: 14 of 15 (Klaviyo Language Property) — code-complete, 1/1 plans done; Phase 15 (Purchase Enrichment) has no dependency on Phase 14 and can be planned/executed independently
-Plan: 01 of 1 (14-01) — complete
-Status: Phase 14 complete (code); live Klaviyo verify pending next main-2026 deploy
-Last activity: 2026-07-03 — Completed 14-01-PLAN.md (deriveUserLanguage util + central enrichUserData wiring + Klaviyo Language profile/event property + KLAV-09 finding doc)
+Phase: 13.1 (Password Length DOS Fix, urgent security insert) complete, 1/1 plans done; Phase 14 of 15 (Klaviyo Language Property) code-complete, 1/1 plans done; Phase 15 (Purchase Enrichment) has no dependency on Phase 14 and can be planned/executed independently
+Plan: 01 of 1 (13.1-01) — complete
+Status: Phase 13.1 complete (code); pending next main-2026 deploy to close the external DOS report on app.xpips.com
+Last activity: 2026-07-03 — Completed 13.1-01-PLAN.md (.max(72) bound added to all 4 user-supplied password fields in auth.validation.ts, verified via direct safeParse against real schemas)
 
-Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████████] 100% (9/9 plans, code-complete + code-level verified) · v1.4 [██████████] 100% (3/3, code-complete + goal-verified 5/5) · v1.5 [█░░░░░░░░░] ~50% (1/1 Phase-14 plans complete; Phase 15 not yet planned)
+Progress: v1.0 [██████████] 100% (10/10) · v1.1 [██████████] 100% (4/4) · v1.2 [██████████] 100% (7/7 code-complete) · v1.3 [██████████] 100% (9/9 plans, code-complete + code-level verified) · v1.4 [██████████] 100% (3/3, code-complete + goal-verified 5/5) · Phase 13.1 [██████████] 100% (1/1, code-complete, urgent security insert) · v1.5 [█░░░░░░░░░] ~50% (1/1 Phase-14 plans complete; Phase 15 not yet planned)
 
-**Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT) + v1.3: Phase 10 (10-04, full capture→persist path) + Phase 12 (SC5, live Trading Cult postback — ALSO needs Trading Cult's real registrationUrl/conversionUrl configured via `PUT /api/tracking/settings`, not just a deploy) + v1.4: Phase 13 (4 checks — cron-expired event in Klaviyo, Stripe failure w/ reason, redelivery no-dup, PAP supersede zero-noise) + v1.5: Phase 14 (JP-signal user → Klaviyo Language:ja on next email-bearing event; stray profile's Language value overwritten/confirmed by the same key).
+**Open post-deploy (all gated on next main-2026 deploy):** v1.0 human-verify (Phases 2 & 3) + v1.1 human-verify (Phase 4) + v1.2: Phase 4.1 (CSV tier-sum), Phase 5 (Daily P&L TC acct 13535), Phase 6 (sidebar dot remote shape), Phase 7 (MarginUsageCard client+admin), Phase 8 (ops sync script XPIPS+FO), Phase 9 (queue-state label NSF payment 6a2c08b1ab4caef5631099a2 → DEV ticket cmqbzq6vc007ds50k008tr3du → WAITING_CLIENT) + v1.3: Phase 10 (10-04, full capture→persist path) + Phase 12 (SC5, live Trading Cult postback — ALSO needs Trading Cult's real registrationUrl/conversionUrl configured via `PUT /api/tracking/settings`, not just a deploy) + v1.4: Phase 13 (4 checks — cron-expired event in Klaviyo, Stripe failure w/ reason, redelivery no-dup, PAP supersede zero-noise) + Phase 13.1 (external DOS report on app.xpips.com /auth/register: confirm oversized password now returns 422, not 500/hang, once deployed) + v1.5: Phase 14 (JP-signal user → Klaviyo Language:ja on next email-bearing event; stray profile's Language value overwritten/confirmed by the same key).
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 37 (v1.0: 10, v1.1: 4, v1.2: 7 [Phases 4.1/5/6/7/8/9], v1.3: 9 [10-01/02/03, 11-01/02/03, 12-01/02/03], v1.4: 3 [13-01, 13-02, 13-03], v1.5: 1 [14-01])
+- Total plans completed: 38 (v1.0: 10, v1.1: 4, v1.2: 7 [Phases 4.1/5/6/7/8/9], v1.3: 9 [10-01/02/03, 11-01/02/03, 12-01/02/03], v1.4: 3 [13-01, 13-02, 13-03], Phase 13.1: 1 [13.1-01], v1.5: 1 [14-01])
 - Average duration: ~6 min
 
 **By Milestone:**
@@ -33,6 +33,7 @@ Progress: v1.0 [██████████] 100% (10/10) · v1.1 [███�
 | v1.2 | 4.1, 5-9 | 7 | ~40 min | ~5 min |
 | v1.3 | 10-12 | 9 | ~2h50m | ~8 min (incl. research + 3 verify cycles) |
 | v1.4 | 13 | 3 | ~28 min | ~9 min |
+| Phase 13.1 (urgent security insert) | 13.1 | 1 | ~6 min | ~6 min |
 | v1.5 | 14-15 | 1 (14 done) | ~3 min | ~3 min |
 
 ## Accumulated Context
@@ -49,10 +50,11 @@ Full decision log in PROJECT.md Key Decisions table. Locked conventions carried 
 - v1.5: properties added to EXISTING events only (no new Klaviyo event/metric names); normalized values only (no raw gateway/PII strings); emits stay at explicit call sites — extends the v1.4 conventions to the two new property clusters (language, purchase enrichment).
 - Full backend `tsc` OOMs on this machine at both default heap and 8GB (`reference_backend_tsc_oom.md`) — use scoped `--skipLibCheck` on specific files, or a `files`-scoped tsconfig override with `incremental:false` for verification harnesses.
 - Phase 14: `deriveUserLanguage()` is a deliberate omit-when-unknown sibling to the existing always-defaults-to-"en" `normalizeLanguage()` — never merge/replace these, other code depends on `normalizeLanguage`'s default behavior. Klaviyo profile key stays capitalized `Language` (matches the pre-existing stray live property) so this code becomes its de-facto owner rather than creating a differently-cased duplicate.
+- Phase 13.1: 72-char max on all user-supplied password fields (register/login/changePassword current+new/forgotPassword new) in `pft-backend/src/app/modules/Auth/auth.validation.ts` — OWASP bcrypt-safe ceiling, closes both the DOS vector and bcrypt's own silent-truncation-beyond-72-bytes correctness gap. `changePassword.newPassword` deliberately left without an added `.min()` (separate pre-existing weakness, out of scope).
 
 ### Roadmap Evolution
 
-- Phase 13.1 inserted after Phase 13: Password Length DOS Fix (URGENT) — external security report (umer@barhamsec.com) flagging unrestricted password length on app.xpips.com /auth/register enabling bcrypt-hashing DOS. Not tied to v1.5 milestone; ordered before Phase 14/15.
+- Phase 13.1 inserted after Phase 13: Password Length DOS Fix (URGENT) — external security report (umer@barhamsec.com) flagging unrestricted password length on app.xpips.com /auth/register enabling bcrypt-hashing DOS. Not tied to v1.5 milestone; ordered before Phase 14/15. **Executed 2026-07-03, code-complete** — single-plan, single-file fix (`auth.validation.ts`), commit `49799c65` on `main-2026`.
 
 ### Pending Todos
 
@@ -68,5 +70,5 @@ Full decision log in PROJECT.md Key Decisions table. Locked conventions carried 
 ## Session Continuity
 
 Last session: 2026-07-03
-Stopped at: Completed 14-01-PLAN.md — Phase 14 (Klaviyo Language Property) code-complete, 1/1 plans.
-Resume file: None. Next action: `/gsd:plan-phase 15` (Purchase Enrichment, no ordering dependency on Phase 14) and/or `/gsd:verify-work 14` once main-2026 deploys.
+Stopped at: Completed 13.1-01-PLAN.md — Phase 13.1 (Password Length DOS Fix) code-complete, 1/1 plans. Phase 14 (Klaviyo Language Property) also code-complete, 1/1 plans, from earlier in the session.
+Resume file: None. Next action: `/gsd:plan-phase 15` (Purchase Enrichment, no ordering dependency on Phase 14) and/or `/gsd:verify-work 13.1` + `/gsd:verify-work 14` once main-2026 deploys.
