@@ -78,9 +78,11 @@ Coverage-gap bugfix on the existing Tracking/destinations dispatch framework (al
 **Plans**: 3 plans (2 waves)
 
 Plans:
-- [ ] 13-01-PLAN.md — Foundation: extend `purchaseFailed` helper (reason+eventId), fix Klaviyo `buildProperties()` to promote reason/error_code, new shared `emitTrackingPurchaseFailed()` util (wave 1)
-- [ ] 13-02-PLAN.md — Wire highest-volume provider-agnostic paths: hourly expiry cron + generic callback handler (covers crypto AND Paysafe via `handleCallback` routing) (wave 2)
-- [ ] 13-03-PLAN.md — Wire explicit gateway webhooks: Stripe (2), FanBasis (3), PayPal capture-denied (1); security/validation guards deliberately left silent (wave 2)
+- [x] 13-01-PLAN.md — Foundation: extend `purchaseFailed` helper (reason+eventId), fix Klaviyo `buildProperties()` to promote reason/error_code, new shared `emitTrackingPurchaseFailed()` util (wave 1) — `c8382daf`, `aa3d6d33`
+- [x] 13-02-PLAN.md — Wire highest-volume provider-agnostic paths: hourly expiry cron + generic callback handler (covers crypto AND Paysafe via `handleCallback` routing) (wave 2) — `148f2b93`, `5fa9d399`
+- [x] 13-03-PLAN.md — Wire explicit gateway webhooks: Stripe (2), FanBasis (3), PayPal capture-denied (1); security/validation guards deliberately left silent (wave 2) — `77b0f3fe`, `b6042d66`
+
+**Executed 2026-07-03.** Verifier: 5/5 must-haves code-level verified (13-VERIFICATION.md, status human_needed — 4 live-Klaviyo checks deferred to post-deploy checklist per project convention, user approved).
 
 ## Progress
 
@@ -102,4 +104,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6 → 7 �
 | 10. Capture & Persist | v1.3 | 3/4 | ✓ Complete (code; 10-04 human-verify pending deploy) | 2026-07-01 |
 | 11. Wire Emits + Dedup | v1.3 | 3/3 | ✓ Complete (code; live event-firing verify post-deploy) | 2026-07-01 |
 | 12. partnerPostback Adapter + Config + Verify | v1.3 | 3/3 | ✓ Complete (code-verified; SC5 live-partner test post-deploy) | 2026-07-01 |
-| 13. Purchase-Failure Tracking Wiring | v1.4 | 0/TBD | Not started | - |
+| 13. Purchase-Failure Tracking Wiring | v1.4 | 3/3 | ✓ Complete (code-verified 5/5; live Klaviyo verify pending deploy) | 2026-07-03 |

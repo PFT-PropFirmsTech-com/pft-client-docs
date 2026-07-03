@@ -9,10 +9,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Purchase Failure Tracking
 
-- [ ] **KLAV-01**: Every real customer-facing failed/expired/cancelled payment fires the existing `purchase_failed` tracking event so it reaches Klaviyo, matching the coverage `purchase_completed` already has (cron expiry job, Stripe, FanBasis, PayPal, NOWPayments/crypto call sites)
-- [ ] **KLAV-02**: The `purchase_failed` event carries a reason/error-code property visible in Klaviyo (adapter's `buildProperties()` must promote `errorCode`/`reason`, not drop it)
-- [ ] **KLAV-03**: The `purchase_failed` event uses a stable, retry-safe eventId per payment (mirrors `purchase:<paymentId>` pattern) so a resent gateway webhook doesn't double-fire the event
-- [ ] **KLAV-04**: Internal dedup/race-guard status flips (e.g. the two non-customer-facing `expired` writes in `payment.service.modular.ts` that clean up duplicate/superseded PAP payment docs) never fire `purchase_failed` — no false "purchase failed" events for customers whose purchase actually succeeded
+- [x] **KLAV-01**: Every real customer-facing failed/expired/cancelled payment fires the existing `purchase_failed` tracking event so it reaches Klaviyo, matching the coverage `purchase_completed` already has (cron expiry job, Stripe, FanBasis, PayPal, NOWPayments/crypto call sites)
+- [x] **KLAV-02**: The `purchase_failed` event carries a reason/error-code property visible in Klaviyo (adapter's `buildProperties()` must promote `errorCode`/`reason`, not drop it)
+- [x] **KLAV-03**: The `purchase_failed` event uses a stable, retry-safe eventId per payment (mirrors `purchase:<paymentId>` pattern) so a resent gateway webhook doesn't double-fire the event
+- [x] **KLAV-04**: Internal dedup/race-guard status flips (e.g. the two non-customer-facing `expired` writes in `payment.service.modular.ts` that clean up duplicate/superseded PAP payment docs) never fire `purchase_failed` — no false "purchase failed" events for customers whose purchase actually succeeded
 
 ## v2 Requirements
 
@@ -40,10 +40,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| KLAV-01 | Phase 13 | Pending |
-| KLAV-02 | Phase 13 | Pending |
-| KLAV-03 | Phase 13 | Pending |
-| KLAV-04 | Phase 13 | Pending |
+| KLAV-01 | Phase 13 | Complete (code-verified; live Klaviyo check post-deploy) |
+| KLAV-02 | Phase 13 | Complete (code-verified; live Klaviyo check post-deploy) |
+| KLAV-03 | Phase 13 | Complete (code-verified; redelivery check post-deploy) |
+| KLAV-04 | Phase 13 | Complete (code-verified; PAP-traffic check post-deploy) |
 
 **Coverage:**
 - v1 requirements: 4 total
