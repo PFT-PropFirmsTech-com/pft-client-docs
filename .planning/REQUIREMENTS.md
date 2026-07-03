@@ -9,8 +9,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Language Property
 
-- [ ] **KLAV-05**: Every Klaviyo-bound event that carries an email also sets the client's language as a Klaviyo profile property, so JP clients are segmentable (client's stated need; location acceptable as proxy per their follow-up)
-- [ ] **KLAV-09**: The language value is derived from real user data with a defined source order (e.g. stored user locale/language → phone region → address country), and the `Language: ja` custom property already seen on one live profile is confirmed code-driven or superseded by this implementation — not left as stale one-off data
+- [x] **KLAV-05**: Every Klaviyo-bound event that carries an email also sets the client's language as a Klaviyo profile property, so JP clients are segmentable (client's stated need; location acceptable as proxy per their follow-up)
+- [x] **KLAV-09**: The language value is derived from real user data with a defined source order (e.g. stored user locale/language → phone region → address country), and the `Language: ja` custom property already seen on one live profile is confirmed code-driven or superseded by this implementation — not left as stale one-off data
 
 ### Purchase Enrichment
 
@@ -42,8 +42,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| KLAV-05 | Phase 14 | Pending |
-| KLAV-09 | Phase 14 | Pending |
+| KLAV-05 | Phase 14 | Complete (code-verified; live Klaviyo check post-deploy) |
+| KLAV-09 | Phase 14 | Complete (sweep re-run: no second code path; adapter sole owner) |
 | KLAV-06 | Phase 15 | Pending |
 | KLAV-10 | Phase 15 | Pending |
 
