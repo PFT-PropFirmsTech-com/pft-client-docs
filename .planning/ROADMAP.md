@@ -118,7 +118,7 @@ Plans:
 
 **Plans:** 3 plans (Wave 1: 15-01 foundation; Wave 2: 15-02 + 15-03 in parallel)
 Plans:
-- [ ] 15-01-PLAN.md — foundation: add platform+addons to ITrackingEventPayload, widen the 3 purchase helper signatures, promote platform+addons into Klaviyo buildProperties allowlist, create shared resolveProgramContext(programId) util
+- [x] 15-01-PLAN.md — foundation: add platform+addons to ITrackingEventPayload, widen the 3 purchase helper signatures, promote platform+addons into Klaviyo buildProperties allowlist, create shared resolveProgramContext(programId) util
 - [ ] 15-02-PLAN.md — enrich completion paths: emitTrackingPurchaseCompleted (standard) + new shared emitPapPaymentCompleted util wired into the 3 inline PAP call sites (program name/platform/phase/accountSize/challengeType/orderId/add-ons/coupon-when-used)
 - [ ] 15-03-PLAN.md — enrich failure path: emitTrackingPurchaseFailed util gains the same program+commerce context (covers all 5 failure call sites via the single shared util, no per-site edits)
 
@@ -145,6 +145,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6 → 7 �
 | 13. Purchase-Failure Tracking Wiring | v1.4 | 3/3 | ✓ Complete (code-verified 5/5; live Klaviyo verify pending deploy) | 2026-07-03 |
 | 13.1. Password Length DOS Fix (INSERTED) | urgent | 1/1 | ✓ Complete (code-verified 5/5; live 400-response verify pending deploy) | 2026-07-03 |
 | 14. Klaviyo Language Property | v1.5 | 1/1 | ✓ Complete (code; live Klaviyo verify pending deploy) | 2026-07-03 |
-| 15. Klaviyo Purchase Enrichment | v1.5 | 0/3 | Planned | - |
+| 15. Klaviyo Purchase Enrichment | v1.5 | 1/3 | In progress (15-01 foundation code-complete) | - |
 
 _Next: `/gsd:plan-phase 14` (or 15 — no dependency order between them)._
