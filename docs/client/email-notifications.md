@@ -1,5 +1,9 @@
 # Email Notifications - User Guide
 
+::: warning Needs review
+This page describes an earlier version of the platform and is being rewritten. Numbers and steps may differ from what your firm has configured; check your dashboard for current values.
+:::
+
 ## Overview
 
 This guide explains all email notifications you'll receive throughout your journey on the platform. Emails are sent automatically at key moments to keep you informed about your account status, trading progress, and important actions.

@@ -10,7 +10,7 @@ hero:
       text: Client Docs
       link: /client/
     - theme: alt
-      text: Admin
+      text: Firm Admin Guide
       link: /admin/
 
 features:
@@ -24,6 +24,6 @@ features:
     details: Dashboard, monitoring, and real-time updates
     link: /client/trading-experience
   - title: Withdrawals
-    details: Eligibility, payment methods, and payout process
+    details: Eligibility, payout methods, limits, and cancelling a request
     link: /client/withdrawal-process
 ---

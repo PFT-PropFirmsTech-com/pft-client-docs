@@ -1,16 +1,20 @@
-# Admin Documentation
+# Firm Admin Guide
 
-Internal technical documentation covering system flows, architecture, and process details.
+Guides for the staff who run a firm on the platform: how accounts, payouts and rules work and what you can configure. This section is public, like the rest of the site. Many pages are being rewritten against the current product; pages marked **Needs review** still describe an earlier version.
 
-## Guides
+## Current
 
-- [Master User Flow](/admin/master-user-flow) — End-to-end user journey with all system touchpoints
-- [New Prop Firm Onboarding Requirements](/admin/new-prop-firm-onboarding-requirements) — Required inputs, credentials, and assets for launch readiness
-- [Registration & Payment](/admin/registration-payment) — Registration, checkout, payment gateways, MT5 provisioning
-- [Trading & Monitoring](/admin/trading-monitoring) — Real-time rule engine, monitoring tiers, account state
-- [Breach Detection](/admin/breach-detection) — Breach types, snapshots, MT5 operations, audit trail
-- [Pass & Progression](/admin/pass-progression) — Pass eligibility, certificates, stage progression
-- [Withdrawal Flow](/admin/withdrawal-flow) — Eligibility calculation, admin review, Rise payout, MT5 deduction
-- [Contract Submission](/admin/contract-submission) — Contract types, Adobe Sign, validation, approval flow
-- [Email Flows](/admin/email-flows) — All email events, triggers, templates, and provider config
-- [Trustpilot Reviews](/admin/trustpilot-reviews) — Setup Trustpilot review invitations, API config, trigger events, and analytics
+- [Withdrawal Flow](/admin/withdrawal-flow): requests, approval, rejection, caps and payout methods
+- [Paid Reset of a Breached Account](/admin/paid-reset): sell a replacement account after a breach
+
+## Needs review
+
+- [Master User Flow](/admin/master-user-flow): end-to-end user journey
+- [New Prop Firm Onboarding Requirements](/admin/new-prop-firm-onboarding-requirements): inputs, credentials and assets for launch
+- [Registration & Payment](/admin/registration-payment): registration, checkout, payment gateways, MT5 provisioning
+- [Trading & Monitoring](/admin/trading-monitoring): rule engine and account state
+- [Breach Detection](/admin/breach-detection): breach types, snapshots, audit trail
+- [Pass & Progression](/admin/pass-progression): pass eligibility, certificates, stage progression
+- [Contract Submission](/admin/contract-submission): contract types and approval flow
+- [Email Flows](/admin/email-flows): email events and templates
+- [Trustpilot Reviews](/admin/trustpilot-reviews): review invitations setup

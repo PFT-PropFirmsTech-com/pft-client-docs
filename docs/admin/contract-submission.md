@@ -1,5 +1,9 @@
 # Contract Submission Flow
 
+::: warning Needs review
+This page describes an earlier version of the platform and is being rewritten. Numbers and steps may differ from what your firm has configured; check your dashboard for current values.
+:::
+
 ## Complete Contract Upload and Signing Process
 
 ```mermaid

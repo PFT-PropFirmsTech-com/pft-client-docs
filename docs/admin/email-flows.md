@@ -1,5 +1,9 @@
 # Email Flows - Technical Documentation
 
+::: warning Needs review
+This page describes an earlier version of the platform and is being rewritten. Numbers and steps may differ from what your firm has configured; check your dashboard for current values.
+:::
+
 ## Overview
 
 The PFT WhiteLabel v2 platform uses a centralized email service (`sendEmailByEvent`) that sends emails based on event names. Email templates are stored in the database and support variable substitution.

@@ -1,5 +1,9 @@
 # Trustpilot Reviews Integration
 
+::: warning Needs review
+This page describes an earlier version of the platform and is being rewritten. Numbers and steps may differ from what your firm has configured; check your dashboard for current values.
+:::
+
 Automatically request Trustpilot reviews from traders after positive events like payouts, challenge completions, and funded account milestones.
 
 **Dashboard Location:** `Admin > Trustpilot Settings`
