@@ -5,7 +5,7 @@ export default withMermaid({
   title: 'PropFirmsTech',
   description: 'Official documentation for PropFirmsTech platform',
   base: '/pft-client-docs/',
-  ignoreDeadLinks: true,
+  ignoreDeadLinks: false,
 
   themeConfig: {
     nav: [
