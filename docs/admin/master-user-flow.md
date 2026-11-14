@@ -1,168 +1,47 @@
 # Master User Flow
 
-::: warning Needs review
-This page describes an earlier version of the platform and is being rewritten. Numbers and steps may differ from what your firm has configured; check your dashboard for current values.
-:::
-
-## Complete User Journey Overview
+The whole journey of a trader on the platform, with a pointer to the page that explains each step. Almost every step has per-firm or per-program settings.
 
 ```mermaid
 flowchart TD
-    Start([New User]) --> Register[Register Account]
-    Register --> VerifyOTP[Verify OTP]
-    VerifyOTP --> Login[Login with 2FA]
-    Login --> Browse[Browse Programs]
-
-    Browse --> SelectProgram[Select Challenge Program]
-    SelectProgram --> SelectAddons[Select Addons/Bundles]
-    SelectAddons --> ApplyCoupon[Apply Coupon/Referral Code]
-    ApplyCoupon --> ChoosePayment{Choose Payment Option}
-
-    ChoosePayment -->|Full Payment| PayFull[Pay Full Price]
-    ChoosePayment -->|Pay After Pass| PayPartial[Pay Initial Price]
-
-    PayFull --> SelectGateway[Select Payment Gateway]
-    PayPartial --> SelectGateway
-
-    SelectGateway --> ProcessPayment[Process Payment]
-    ProcessPayment --> PaymentSuccess{Payment Success?}
-
-    PaymentSuccess -->|No| PaymentFailed[Payment Failed]
-    PaymentFailed --> Browse
-
-    PaymentSuccess -->|Yes| ProvisionMT5[Provision MT5 Account]
-    ProvisionMT5 --> ReceiveCredentials[Receive MT5 Credentials]
-    ReceiveCredentials --> ConnectMT5[Connect to MT5]
-
-    ConnectMT5 --> StartTrading[Start Trading]
-    StartTrading --> RealTimeMonitor[Real-Time Trade Monitoring]
-
-    RealTimeMonitor --> CheckRules{Rule Engine Check}
-
-    CheckRules -->|Breach Detected| BreachProcess[Breach Process]
-    BreachProcess --> AccountBanned[Account Banned/Archived]
-    AccountBanned --> BuyNewAccount{Buy New Account?}
-    BuyNewAccount -->|Yes| Browse
-    BuyNewAccount -->|No| End1([End])
-
-    CheckRules -->|Profit Target Met| PassCheck{Pass Eligibility?}
-    PassCheck -->|Not Eligible| ContinueTrading[Continue Trading]
-    ContinueTrading --> RealTimeMonitor
-
-    PassCheck -->|Eligible| PassProcess[Pass Process]
-    PassProcess --> GenerateCert[Generate Certificate]
-    GenerateCert --> NextStage{Has Next Stage?}
-
-    NextStage -->|Yes - Phase 2/3| ProvisionNext[Provision Next Stage Account]
-    ProvisionNext --> PayAfterPassCheck{Pay After Pass?}
-    PayAfterPassCheck -->|Yes| PayRemaining[Pay Remaining Amount]
-    PayAfterPassCheck -->|No| ConnectMT5
-    PayRemaining --> ConnectMT5
-
-    NextStage -->|Yes - Funded| FundedAccount[Funded Account]
-    FundedAccount --> PayAfterPassCheck2{Pay After Pass?}
-    PayAfterPassCheck2 -->|Yes| PayRemaining2[Pay Remaining Amount]
-    PayAfterPassCheck2 -->|No| TradeFunded[Trade Funded Account]
-    PayRemaining2 --> TradeFunded
-
-    TradeFunded --> FundedMonitor[Real-Time Monitoring]
-    FundedMonitor --> FundedRules{Rule Check}
-
-    FundedRules -->|Breach| BreachProcess
-    FundedRules -->|Trading Days Met| WithdrawalEligible{Withdrawal Eligible?}
-
-    WithdrawalEligible -->|No| TradeFunded
-    WithdrawalEligible -->|Yes| RequestWithdrawal[Request Withdrawal]
-
-    RequestWithdrawal --> SubmitContract{Contract Required?}
-    SubmitContract -->|Yes| UploadContract[Upload Contract]
-    UploadContract --> ContractReview[Admin Reviews Contract]
-    ContractReview --> ContractApproved{Approved?}
-    ContractApproved -->|No| UploadContract
-    ContractApproved -->|Yes| WithdrawalReview
-
-    SubmitContract -->|No| WithdrawalReview[Admin Reviews Withdrawal]
-    WithdrawalReview --> WithdrawalApproved{Approved?}
-
-    WithdrawalApproved -->|No| WithdrawalRejected[Withdrawal Rejected]
-    WithdrawalRejected --> TradeFunded
-
-    WithdrawalApproved -->|Yes| ProcessPayout[Process Payout]
-    ProcessPayout --> PayoutMethod{Payout Method}
-
-    PayoutMethod -->|Rise Crypto| AutoPayout[Automated Crypto Payout]
-    PayoutMethod -->|Manual| ManualPayout[Manual Bank Transfer]
-
-    AutoPayout --> PayoutComplete[Payout Completed]
-    ManualPayout --> PayoutComplete
-
-    PayoutComplete --> DeductMT5[Deduct from MT5 Balance]
-    DeductMT5 --> ResetHolding[Reset Holding Period]
-    ResetHolding --> TradeFunded
-
-    NextStage -->|No| End2([End - Challenge Complete])
-
-    style Start fill:#e1f5e1
-    style End1 fill:#ffe1e1
-    style End2 fill:#e1f5e1
-    style BreachProcess fill:#ffcccc
-    style PassProcess fill:#ccffcc
-    style PayoutComplete fill:#ccffcc
-    style AccountBanned fill:#ff9999
+    A[Sign up or buy at checkout] --> B[Buy a program]
+    B --> C[Trade on a challenge stage]
+    C -->|Breach| X[Breached]
+    C -->|Pass| D[Passed]
+    D --> E{Next stage?}
+    E -->|Yes| C
+    E -->|No| F[KYC and contract approved]
+    F --> G[Funded account]
+    G --> H[Payout request]
+    H --> I[Review and payout]
+    X --> R[Paid reset, Rebound or new purchase]
+    R --> C
 ```
 
-## Key Decision Points
+## 1. Account and purchase
 
-### 1. Payment Options
-- **Full Payment**: Pay entire program cost upfront
-- **Pay After Pass**: Pay 20-30% initially, remainder after passing each stage
+- A trader can register first, or buy at checkout, which creates the account and emails a temporary password. Google sign-in exists too.
+- The emailed verification code at sign-up and login is a **firm-wide setting**. When it is off, traders register and log in without a code. Staff logins always require it.
+- Checkout offers the payment gateways your firm has switched on, add-ons, bundles and up to two stackable coupons. Free trial and free challenge programs start from their own pages.
+- **Pay After Pass** programs split the price: an initial price now and the remaining price once, before the funded account. See [Pass & Progression](/admin/pass-progression).
 
-### 2. Trading Outcomes
-- **Breach**: Account banned, must purchase new account
-- **Pass**: Progress to next stage or funded account
-- **Withdrawal**: Available only on funded accounts after meeting requirements
+## 2. Trading and monitoring
 
-### 3. Payout Methods
-- **Rise Payout**: Automated cryptocurrency payments
-- **Manual Payout**: Bank transfers processed by admin
+Each stage is its own account. The rule engine watches it live: see [Trading & Monitoring](/admin/trading-monitoring) and [Breach Detection](/admin/breach-detection).
 
-## Account Types by Stage
+## 3. Pass or breach
 
-| Stage | Account Type | Purpose |
-|-------|-------------|---------|
-| Phase 1 | Challenge | Meet profit target, avoid breaches |
-| Phase 2 | Challenge | Meet profit target, avoid breaches |
-| Phase 3 | Challenge | Meet profit target, avoid breaches |
-| Funded | Live Trading | Trade for profit splits, request withdrawals |
+- A pass disables the old account and creates the next stage, or leads to funded.
+- A breach disables trading and records the reason. The trader can then be offered a paid reset ([Paid Reset](/admin/paid-reset)) or a Rebound, or buy again.
 
-## Status Transitions
+## 4. Funded
 
-```mermaid
-stateDiagram-v2
-    [*] --> Pending: Payment Initiated
-    Pending --> Active: Payment Confirmed
-    Active --> Passed: Profit Target Met
-    Active --> Breached: Rule Violation
-    Passed --> Active: Next Stage Provisioned
-    Passed --> Funded: Final Stage Complete
-    Funded --> Withdrawn: Payout Processed
-    Withdrawn --> Funded: Continue Trading
-    Breached --> [*]: Account Archived
-```
+Before the funded account exists the trader needs approved **KYC** and an approved **contract**, and you can hold the account for manual approval.
 
-## Real-Time Monitoring Tiers
+## 5. Payouts
 
-| Tier | Condition | Check Frequency |
-|------|-----------|-----------------|
-| CRITICAL | 70%+ of limit used | 500ms (2x/second) |
-| AT_RISK | 50%+ of limit used | 1 second |
-| HIGH | Has open positions | 2 seconds |
-| NORMAL | Recent activity | 5 seconds |
-| IDLE | No recent trades | 15 seconds |
-| DORMANT | Very inactive | 60 seconds |
+A payout request needs the same approved KYC and contract, a funded account and a completed payout cycle. Staff approve, reject or cancel it: see [Withdrawal Flow](/admin/withdrawal-flow).
 
----
+## Account states
 
-**Generated**: 2026-02-08
-**System**: PFT WhiteLabel v2 Dashboard
-**Components**: pft-backend, pft-dashboard, pft-rule-checker, mt5-rest-api
+Accounts are **live**, **passed** or **breached**. Stages are phase 1 to 3, funded, passed and breached, plus a Pay After Pass account awaiting payment.
