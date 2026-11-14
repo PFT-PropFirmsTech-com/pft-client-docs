@@ -1,233 +1,55 @@
 # Account Outcomes
 
-## Understanding Your Results
+Every account ends up in one of three states in your dashboard: **Live** (still trading), **Passed**, or **Breached**. This page explains what each one means and what you can do next.
 
-```mermaid
-flowchart TD
-    Start([Trading in Progress]) --> CheckStatus[Check Your Status]
+## Passing a stage
 
-    CheckStatus --> Outcome{What's Your Result?}
+You pass a stage when the account meets its profit target and its other objectives (such as minimum trading days) without breaking a rule. Targets, limits and the number of stages are set per program, so check your own program's rules on the account page.
 
-    Outcome -->|Success Path| PassCheck[Profit Target Reached]
-    Outcome -->|Challenge Path| StillTrading[Still Trading]
-    Outcome -->|Limit Reached| BreachCheck[Risk Limit Exceeded]
+What happens:
 
-    PassCheck --> Celebrate[Congratulations!<br/>You Passed]
-    Celebrate --> Certificate[Receive Achievement Certificate]
-    Certificate --> NextStep{What's Next?}
+1. The stage is marked **Passed**. Trading on that account stops and open positions are closed.
+2. You receive a certificate email if your firm uses certificates.
+3. If there is a next stage, you receive a **new account** with new login details by email.
 
-    NextStep -->|More Stages| AdvanceStage[Advance to Next Stage:<br/>- New account provided<br/>- Higher targets<br/>- Same or larger size]
+### Becoming funded
 
-    NextStep -->|Funded Stage| GetFunded[Funded Account Activated:<br/>- Trade with real capital<br/>- Earn profit splits<br/>- Request withdrawals]
+Before a funded account is created:
 
-    AdvanceStage --> NewAccount[Receive New Credentials]
-    GetFunded --> NewAccount
+- **KYC** must be approved.
+- Your **contract** must be signed and approved.
+- Your firm may also review the pass manually first. The account then shows as passed and in review until staff progress it.
 
-    NewAccount --> StartNew[Start Trading New Stage]
-    StartNew --> Success([Continue Your Journey])
+On **Pay After Pass** programs the remaining program fee must also be paid, within the payment window shown on your account (14 days from the pass by default, unless your firm extends it). Trading stays off until it is paid.
 
-    BreachCheck --> Closed[Challenge Not Met]
-    Closed --> Explanation[See What Happened:<br/>- Which limit was reached<br/>- Account snapshot<br/>- Trading summary]
+## When an account is breached
 
-    Explanation --> LearnMore[Review Your Trading:<br/>- See your trades<br/>- Understand the outcome<br/>- Learn for next time]
+A breach ends the account at once: trading is disabled and open positions are closed. The account shows "Account evaluation failed" with the reason.
 
-    LearnMore --> Options{What Would You Like to Do?}
+Which rules apply depends on your program. Rules your program can enforce:
 
-    Options -->|Try Again| NewChallenge[Start New Challenge:<br/>- Choose same or different size<br/>- Apply lessons learned<br/>- Fresh start]
+- Daily loss limit, maximum loss (static or trailing drawdown)
+- Time limit on the challenge
+- Minimum trade duration, mandatory stop loss, mandatory take profit
+- Maximum lot size, maximum risk per trade, hedging, trade size consistency
+- No holding positions over the weekend
+- Inactivity (a warning first, then a breach)
 
-    Options -->|Review Details| ViewDetails[View Full Details:<br/>- All trades<br/>- Account history<br/>- Performance stats]
+Many of these start with a **warning** email before they become a breach, depending on how your firm configured them. Read the warning and the rules shown on your account page.
 
-    Options -->|Contact Us| Support[Contact Support:<br/>- Ask questions<br/>- Get guidance<br/>- Discuss options]
+## Your options after a breach
 
-    NewChallenge --> Purchase[Purchase New Account]
-    Purchase --> Success
+- **Reset the account**, if your program offers it. You pay the reset price and receive a **new account** on the same program at its starting balance with new login details. The breached account stays as it is, with its history, and nothing is carried over. See [Reset a Breached Account](/client/reset-breached-account).
+- **Take a Rebound offer**, if your firm has sent you one.
+- **Buy a new challenge.** Any size or program your firm sells.
+- **Review the account.** Look at the trades and the reason before you try again.
+- **Ask support** about your result.
 
-    ViewDetails --> Options
-    Support --> Options
+## Tracking progress
 
-    StillTrading --> Monitor[Keep Trading:<br/>- Work toward target<br/>- Manage risk<br/>- Track progress]
+While trading, the account page shows each objective as Passed, Failed, Ongoing or Upcoming, plus drawdown and trading-day progress. Rule warnings arrive by email.
 
-    Monitor --> CheckStatus
+## Related
 
-    style Celebrate fill:#ccffcc
-    style GetFunded fill:#99ff99
-    style Success fill:#e1f5e1
-    style Closed fill:#ffcccc
-    style Purchase fill:#ffffcc
-```
-
-## Success Outcomes
-
-### When You Pass
-
-```mermaid
-flowchart LR
-    A[Target<br/>Reached] --> B[Certificate<br/>Earned]
-    B --> C[Next Stage<br/>or Funded]
-    C --> D[New<br/>Account]
-    D --> E[Continue<br/>Trading]
-
-    style A fill:#ccffcc
-    style B fill:#ccffcc
-    style C fill:#99ff99
-    style D fill:#99ff99
-    style E fill:#ccffcc
-```
-
-#### What Happens
-1. **Immediate Recognition**: Dashboard shows success message
-2. **Certificate Issued**: Professional achievement certificate
-3. **Email Notification**: Congratulations email with details
-4. **Next Steps**: Clear instructions for advancement
-
-#### What You Receive
-- **Achievement Certificate**: Proof of your success
-- **Progress Summary**: Your trading performance
-- **Next Stage Details**: Information about advancement
-- **New Credentials**: Access to next account (if applicable)
-
-### Advancement Paths
-
-| Current Stage | Next Stage | What Changes |
-|--------------|------------|--------------|
-| **Phase 1** | Phase 2 or Funded | Higher targets, new account |
-| **Phase 2** | Phase 3 or Funded | Final evaluation or funded |
-| **Phase 3** | Funded Account | Real trading begins |
-| **Funded** | Continue Trading | Keep earning and withdrawing |
-
-## Challenge Outcomes
-
-### When Limits Are Reached
-
-```mermaid
-flowchart LR
-    A[Limit<br/>Reached] --> B[Account<br/>Closed]
-    B --> C[Review<br/>Details]
-    C --> D[Learn &<br/>Improve]
-    D --> E[Try<br/>Again]
-
-    style A fill:#ffcccc
-    style B fill:#ffcccc
-    style C fill:#ffffcc
-    style D fill:#e6f3ff
-    style E fill:#ccffcc
-```
-
-#### What Happens
-1. **Notification**: Dashboard shows outcome
-2. **Summary Provided**: See what happened
-3. **Account Closed**: Trading stops on this account
-4. **Options Presented**: Clear next steps available
-
-#### What You See
-- **Clear Explanation**: Which limit was reached
-- **Trading Summary**: Your trades and performance
-- **Account Snapshot**: Final account state
-- **Learning Points**: Understand the outcome
-
-### Common Scenarios
-
-#### Daily Loss Limit
-- **What it means**: Maximum daily loss reached
-- **Why it matters**: Protects your account
-- **Next time**: Manage daily risk better
-
-#### Total Loss Limit
-- **What it means**: Overall loss limit reached
-- **Why it matters**: Account protection rule
-- **Next time**: Use better risk management
-
-#### Trading Rules
-- **What it means**: A trading rule wasn't followed
-- **Why it matters**: Rules ensure fair evaluation
-- **Next time**: Review and follow all rules
-
-## Your Options After Challenge
-
-### Option 1: Start Fresh
-- **New Challenge**: Purchase a new account
-- **Same or Different**: Choose any size or type
-- **Apply Learning**: Use experience from previous attempt
-- **Fresh Start**: Clean slate with new account
-
-### Option 2: Review and Learn
-- **Study Trades**: Analyze what happened
-- **Identify Patterns**: See where to improve
-- **Understand Rules**: Review requirements
-- **Plan Better**: Develop improved strategy
-
-### Option 3: Get Support
-- **Ask Questions**: Contact support team
-- **Get Guidance**: Understand your results
-- **Discuss Options**: Explore possibilities
-- **Receive Help**: Get assistance with next steps
-
-## Progress Tracking
-
-### While Trading
-
-```mermaid
-graph TD
-    subgraph Your Progress
-        A[Profit Progress<br/>Toward Target]
-        B[Trading Days<br/>Completed]
-        C[Risk Usage<br/>Limits Remaining]
-        D[Performance<br/>Statistics]
-    end
-
-    style A fill:#ccffcc
-    style B fill:#ccccff
-    style C fill:#ffffcc
-    style D fill:#e6e6e6
-```
-
-### Status Indicators
-- **Green**: On track, good progress
-- **Yellow**: Approaching limits, be careful
-- **Red**: Very close to limits, trade cautiously
-
-## Understanding Your Results
-
-### Success Metrics
-- **Profit Target**: Did you reach the goal?
-- **Trading Days**: Did you trade enough days?
-- **Risk Management**: Did you stay within limits?
-- **Rule Compliance**: Did you follow all rules?
-
-### Performance Review
-- **Win Rate**: Percentage of winning trades
-- **Average Profit**: Typical profit per trade
-- **Risk Usage**: How much risk you used
-- **Consistency**: Trading pattern quality
-
-## Moving Forward
-
-### After Success
-1. **Celebrate**: Acknowledge your achievement
-2. **Prepare**: Get ready for next stage
-3. **Continue**: Keep improving your skills
-4. **Advance**: Progress toward funded trading
-
-### After Challenge
-1. **Review**: Understand what happened
-2. **Learn**: Identify improvement areas
-3. **Plan**: Develop better strategy
-4. **Retry**: Start fresh when ready
-
-## Support Resources
-
-### Available Help
-- **FAQ**: Common questions answered
-- **Trading Tips**: Improve your strategy
-- **Rule Guides**: Understand requirements
-- **Support Team**: Personal assistance
-
-### Contact Options
-- **Email Support**: Detailed inquiries
-- **Live Chat**: Quick questions
-- **Help Center**: Self-service resources
-- **Community**: Connect with other traders
-
----
-
-**Every outcome is a learning opportunity. Success or challenge, we're here to support your journey.**
+- [Trading Experience](/client/trading-experience)
+- [Withdrawal Process](/client/withdrawal-process)

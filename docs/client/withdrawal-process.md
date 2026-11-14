@@ -1,324 +1,88 @@
 # Withdrawal Process
 
-## Getting Your Profits Paid Out
+How to request a payout from a funded account, what happens to your request, and what limits apply. Your firm sets many of the numbers below (minimum days, waiting periods, profit split, payout caps, which payout methods are on). The Withdrawals page in your dashboard always shows the values that apply to you.
 
-```mermaid
-flowchart TD
-    Start([Funded Account Trading]) --> CheckEligible[Check Withdrawal Eligibility]
+## Before you can request
 
-    CheckEligible --> Requirements[Review Requirements:<br/>- Funded account status<br/>- Minimum trading days met<br/>- Waiting period satisfied<br/>- Positive profit balance]
+You can request a payout when all of these are true:
 
-    Requirements --> Eligible{Are You Eligible?}
+- **The account is funded.** Challenge and evaluation accounts cannot request payouts. Free trial accounts never can (see [Free Trial Accounts](/client/free-trial)).
+- **Your identity and contract are approved.** KYC verification and your contract must both be approved.
+- **The payout cycle conditions are met.** Your program sets a minimum number of trading days per payout, and may also require a minimum profit on those days and a waiting period between payouts. Some add-ons (for example faster or on-demand payouts) change these.
+- **There is profit to pay out.** The amount is limited by your available profit and your profit share.
+- **No other request is open on the account.** One pending request per account at a time.
+- **All positions on the account are closed.**
+- **You have a payment method saved.** Add a wallet or payout details first.
 
-    Eligible -->|Not Yet| SeeWhy[See Why Not Eligible:<br/>- Days remaining<br/>- Waiting period left<br/>- Requirements needed]
+The page tells you which condition is missing when you are not yet eligible.
 
-    SeeWhy --> KeepTrading[Continue Trading]
-    KeepTrading --> CheckEligible
+## Requesting a payout
 
-    Eligible -->|Yes| RequestWithdrawal[Request Withdrawal]
+1. Open **My Payments → Withdrawals**.
+2. Choose the funded account.
+3. Enter the amount. The minimum is **$10**. There is no fixed maximum: your limit is your available profit share, and your firm may apply a payout cap. When a cap applies, the page says: "Payout cap applied — the most you can request on this account is ...".
+4. Choose a payout method.
+5. Check the details and the profit split shown, then submit.
 
-    RequestWithdrawal --> EnterAmount[Enter Withdrawal Amount]
-    EnterAmount --> ValidAmount{Amount Valid?}
+### Payout methods
 
-    ValidAmount -->|No| AmountError[Amount Issue:<br/>- Too high<br/>- Too low<br/>- Exceeds profit]
-    AmountError --> EnterAmount
+Your firm switches each method on or off, so you may see fewer than these:
 
-    ValidAmount -->|Yes| ChooseMethod[Choose Payment Method]
+- **Crypto** (USDT on the TRC-20 network)
+- **Bank transfer**
+- **Revolut Tag**
+- **Rise Pay**: use your RiseID after you have joined your firm's Rise team
 
-    ChooseMethod --> MethodOptions{Select Method}
+If a method is not offered to you, the form says it is not available and asks you to choose another.
 
-    MethodOptions -->|Cryptocurrency| CryptoSetup[Enter Crypto Wallet Address]
-    MethodOptions -->|Bank Transfer| BankSetup[Enter Bank Details]
-    MethodOptions -->|PayPal| PayPalSetup[Enter PayPal Email]
+> **While a request is open, trading on that account is switched off.** It is switched back on when the request is approved and paid, rejected, or cancelled.
 
-    CryptoSetup --> ReviewRequest
-    BankSetup --> ReviewRequest
-    PayPalSetup --> ReviewRequest
+## What happens next
 
-    ReviewRequest[Review Your Request:<br/>- Withdrawal amount<br/>- Your share percentage<br/>- Payment method<br/>- Estimated payout]
+A request has one of five statuses:
 
-    ReviewRequest --> AddNotes{Add Notes?}
-    AddNotes -->|Yes| EnterNotes[Add Comments or Instructions]
-    AddNotes -->|No| SubmitRequest
+- **Pending**: waiting for review.
+- **Approved**: accepted by your firm.
+- **Completed**: paid out.
+- **Rejected**: not accepted (see [Rejected vs Cancelled](/client/reward-rejected-vs-cancelled)).
+- **Cancelled**: withdrawn, by you or by staff.
 
-    EnterNotes --> SubmitRequest[Submit Request]
+How long review takes is set by your firm; the Withdrawals page shows the expected time. You can open the review summary on a request to see how it was assessed.
 
-    SubmitRequest --> Confirmation[Request Submitted Successfully]
+When your firm **approves** the request:
 
-    Confirmation --> Notify[You'll Receive:<br/>- Email confirmation<br/>- Request reference number<br/>- Expected timeline<br/>- Dashboard notification]
+- The payout amount, plus your firm's share of the profit, is deducted from the account balance.
+- You receive the approval and confirmation emails together, with a payout certificate if your firm has one set up.
+- The request is marked completed shortly after.
+- After a **full** payout the account goes back to its starting balance and the payout cycle starts again. After a **partial** payout the rest stays on the account.
 
-    Notify --> AdminReview[Request Under Review]
+When the money reaches you depends on the method and on your firm's payment run.
 
-    AdminReview --> ReviewProcess[Review Process:<br/>- Account verification<br/>- Trading review<br/>- Compliance check<br/>- Amount validation]
+## Your profit share
 
-    ReviewProcess --> Decision{Review Decision}
+Your share of the profit is set by your program, an add-on you bought, or an override on your account. Your firm's default applies if none is set. The request form shows your exact share and the amount you will receive before you submit. Do not rely on a "typical" percentage: check your own program.
 
-    Decision -->|Approved| Approved[Withdrawal Approved]
-    Decision -->|Needs Info| MoreInfo[Additional Information Needed]
-    Decision -->|Rejected| Declined[Request Rejected]
-    Decision -->|Cancelled| Cancelled[Request Cancelled]
+## Cancel a request
 
-    MoreInfo --> ProvideInfo[Provide Requested Information]
-    ProvideInfo --> AdminReview
+You can cancel your own pending payout request **within 24 hours** of submitting it:
 
-    Declined --> Reason[See Rejection Reason:<br/>- Rule violation or compliance issue<br/>- Balance may be penalized<br/>- Contact support if needed]
+1. Open the request on the Withdrawals page and choose **Cancel request**.
+2. Confirm. The request is withdrawn, trading on the account is switched back on, and you can submit a new request when you are ready.
 
-    Reason --> ContactSupport{Contact Support?}
-    ContactSupport -->|Yes| Support[Speak with Support Team]
-    ContactSupport -->|No| KeepTrading
+If **Cancel request** is not offered, the page now says why:
 
-    Support --> Resolution{Issue Resolved?}
-    Resolution -->|Yes| RequestWithdrawal
-    Resolution -->|No| KeepTrading
+- The 24-hour window has closed. Contact support if you still need it withdrawn.
+- The request was approved and is being paid out.
+- It is a reward claim from a short-term challenge. Contact support.
 
-    Cancelled --> CancelReason[See Cancellation Reason:<br/>- Wrong wallet address<br/>- Incorrect payment details<br/>- Requested by you<br/>- No balance impact]
+## Free trial accounts
 
-    CancelReason --> FixAndResubmit[Fix the Issue & Resubmit]
-    FixAndResubmit --> RequestWithdrawal
+Free trial accounts are demo accounts. The Withdrawals page says "Payouts are not available for free trial accounts" and offers no request button. Upgrade to a funded account to request a payout.
 
-    Approved --> Processing[Processing Your Payout]
+## Tracking your payouts
 
-    Processing --> PaymentMethod{Payment Method}
+The Withdrawals page lists every request with its status and the amount.
 
-    PaymentMethod -->|Cryptocurrency| CryptoPayout[Crypto Transfer Initiated:<br/>- Sent to your wallet<br/>- Usually 10-60 minutes]
+## Help
 
-    PaymentMethod -->|Bank Transfer| BankPayout[Bank Transfer Initiated:<br/>- Sent to your bank<br/>- Usually 3-5 business days]
-
-    PaymentMethod -->|PayPal| PayPalPayout[PayPal Transfer Initiated:<br/>- Sent to your PayPal<br/>- Usually 1-2 business days]
-
-    CryptoPayout --> Complete
-    BankPayout --> Complete
-    PayPalPayout --> Complete
-
-    Complete[Payout Completed]
-
-    Complete --> FinalNotify[You'll Receive:<br/>- Completion email<br/>- Transaction details<br/>- Updated balance<br/>- Receipt available]
-
-    FinalNotify --> BalanceUpdated[Account Balance Updated]
-
-    BalanceUpdated --> NextWithdrawal{Request Another Withdrawal?}
-
-    NextWithdrawal -->|Yes| WaitPeriod[Wait for Next Eligibility Period]
-    WaitPeriod --> CheckEligible
-
-    NextWithdrawal -->|No| ContinueTrading[Continue Trading]
-    ContinueTrading --> End([Keep Earning])
-
-    style Eligible fill:#ccffcc
-    style Approved fill:#ccffcc
-    style Complete fill:#99ff99
-    style Declined fill:#ffcccc
-    style End fill:#e1f5e1
-```
-
-## Eligibility Requirements
-
-### What You Need
-
-```mermaid
-graph TD
-    subgraph Requirements["Withdrawal Requirements"]
-        A[Funded Account<br/>Must be funded stage]
-        B[Trading Days<br/>Minimum days met]
-        C[Waiting Period<br/>Time since last withdrawal]
-        D[Profit Balance<br/>Positive profits available]
-    end
-
-    style A fill:#ccffcc
-    style B fill:#ccffcc
-    style C fill:#ccffcc
-    style D fill:#ccffcc
-```
-
-#### Typical Requirements
-- **Account Status**: Must be in funded stage
-- **Trading Days**: Usually 5-10 days of trading
-- **Waiting Period**: Usually 7-14 days between withdrawals
-- **Profit Balance**: Must have profits to withdraw
-
-### Check Your Eligibility
-
-Your dashboard shows:
-- **Current Status**: Eligible or not eligible
-- **Days Completed**: Trading days count
-- **Next Eligible Date**: When you can withdraw next
-- **Available Profit**: Amount you can withdraw
-
-## Payment Methods
-
-### Cryptocurrency
-- **Speed**: 10-60 minutes
-- **Fees**: Low (0.5-1%)
-- **What You Need**: Crypto wallet address
-- **Best For**: Fast payouts
-
-### Bank Transfer
-- **Speed**: 3-5 business days
-- **Fees**: Moderate
-- **What You Need**: Bank account details
-- **Best For**: Traditional banking
-
-### PayPal
-- **Speed**: 1-2 business days
-- **Fees**: Moderate (2.9%)
-- **What You Need**: PayPal email
-- **Best For**: Convenient transfers
-
-## Your Profit Share
-
-```mermaid
-flowchart LR
-    A[Total Profit<br/>$10,000] --> B[Your Share<br/>80%]
-    B --> C[You Receive<br/>$8,000]
-
-    A --> D[Platform Share<br/>20%]
-    D --> E[Platform Keeps<br/>$2,000]
-
-    style C fill:#ccffcc
-    style E fill:#e6e6e6
-```
-
-### Understanding Profit Splits
-- **Your Share**: Typically 70-90% of profits
-- **Platform Share**: Typically 10-30% of profits
-- **Clear Display**: See exact amounts before submitting
-- **No Hidden Fees**: What you see is what you get
-
-## Withdrawal Timeline
-
-```mermaid
-gantt
-    title Typical Withdrawal Timeline
-    dateFormat YYYY-MM-DD
-
-    section Request
-    Submit Request           :milestone, 2026-02-08, 0d
-
-    section Review
-    Under Review            :active, 2026-02-08, 2d
-
-    section Approval
-    Approved                :milestone, 2026-02-10, 0d
-
-    section Processing
-    Payment Processing      :active, 2026-02-10, 3d
-
-    section Complete
-    Payout Received         :milestone, 2026-02-13, 0d
-```
-
-### Expected Timeframes
-1. **Submission**: Instant
-2. **Review**: 1-3 business days
-3. **Processing**: Varies by method
-4. **Receipt**: Based on payment method
-
-## What Happens During Review
-
-### We Check
-- **Account Status**: Verify funded account
-- **Trading Activity**: Review your trades
-- **Compliance**: Ensure rules followed
-- **Amount**: Validate withdrawal amount
-
-### You'll Be Notified
-- **Status Updates**: Email notifications
-- **Dashboard Updates**: Real-time status
-- **Any Questions**: We'll contact you if needed
-- **Final Decision**: Approval or decline with reason
-
-## After Approval
-
-### Processing Steps
-1. **Payment Initiated**: Transfer starts
-2. **In Transit**: Payment being processed
-3. **Completed**: Funds delivered
-4. **Balance Updated**: Account reflects withdrawal
-
-### What You Receive
-- **Confirmation Email**: Payment details
-- **Transaction ID**: Reference number
-- **Receipt**: Downloadable proof
-- **Updated Dashboard**: New balance shown
-
-## Withdrawal Limits
-
-### Typical Limits
-- **Minimum**: $100-$500 per withdrawal
-- **Maximum**: $50,000-$100,000 per withdrawal
-- **Frequency**: Based on waiting period
-- **Balance**: Cannot exceed available profit
-
-### Your Dashboard Shows
-- **Available Amount**: How much you can withdraw
-- **Minimum Required**: Lowest amount allowed
-- **Maximum Allowed**: Highest amount allowed
-- **Next Eligible Date**: When you can withdraw again
-
-## If Your Request Is Rejected
-
-A rejection means there was a compliance or eligibility issue with your withdrawal. Depending on the reason, your account balance may be penalized.
-
-### Common Reasons
-- **Rule Violation**: Trading rules were broken
-- **Suspicious Activity**: Account flagged for review
-- **Compliance Issue**: Verification or contract requirements not met
-- **Insufficient Trading Days**: Need more trading activity
-
-### What You Can Do
-1. **Review Reason**: Read the rejection reason in your email carefully
-2. **Contact Support**: Get clarification if you believe it was an error
-3. **Meet Requirements**: Fulfill any missing criteria
-4. **Resubmit**: Try again when eligible (if applicable)
-
-> **Important**: A rejected payout may include a balance deduction as a penalty. Check your account balance after receiving a rejection email.
-
----
-
-## If Your Request Is Cancelled
-
-A cancellation is a neutral administrative action — no penalty is applied and your account balance is not affected. You can immediately resubmit.
-
-### Common Reasons
-- **Wrong Wallet Address**: Incorrect crypto wallet provided
-- **Incorrect Payment Details**: Bank or PayPal info was wrong
-- **Your Request**: You asked support to cancel it
-- **Administrative Correction**: Admin needed to void and redo
-
-### What You Can Do
-1. **Review Reason**: Check the cancellation reason in your email
-2. **Fix the Issue**: Correct your payment details
-3. **Resubmit Immediately**: Submit a new withdrawal request right away
-
-## Managing Your Withdrawals
-
-### Best Practices
-- **Check Eligibility First**: Verify before requesting
-- **Accurate Information**: Provide correct payment details
-- **Reasonable Amounts**: Stay within limits
-- **Plan Ahead**: Consider waiting periods
-- **Keep Trading**: Continue earning while waiting
-
-### Track Your Withdrawals
-- **Request History**: See all past requests
-- **Status Tracking**: Monitor current requests
-- **Payment Records**: View completed payouts
-- **Total Withdrawn**: Track lifetime earnings
-
-## Support and Help
-
-### Need Assistance?
-- **FAQ Section**: Common questions answered
-- **Live Chat**: Quick help available
-- **Email Support**: Detailed inquiries
-- **Help Center**: Self-service resources
-
-### Contact Us About
-- **Eligibility Questions**: When can I withdraw?
-- **Payment Methods**: Which option is best?
-- **Status Updates**: Where is my withdrawal?
-- **Technical Issues**: Payment problems
-
----
-
-**Your earnings, your way. We make withdrawals simple and transparent.**
+Contact your firm's support from the dashboard if a request seems stuck, a payout method is missing, or you need a request withdrawn after the cancel window.
