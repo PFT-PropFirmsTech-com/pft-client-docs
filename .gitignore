@@ -33,3 +33,6 @@ docs/.vitepress/cache/
 
 # Local tool settings (per-developer, may embed connection details)
 .claude/settings.local.json
+
+# Internal planning notes: kept out of the public repo
+.planning/
